@@ -5,8 +5,9 @@ compress_text_image.py
 
 将以文字为主的图片等比例缩小并压缩到指定体积附近。
 默认目标：
-- 最长边 <= 1500px
+- 最长边 <= 1300px
 - 文件体积 <= 80KB
+- 输出 JPG
 - 尽量保留文字清晰度
 
 安装依赖：
@@ -15,7 +16,8 @@ compress_text_image.py
 使用示例：
     python compress_text_image.py input.png
     python compress_text_image.py input.png -o output.webp
-    python compress_text_image.py input.png --target-kb 80 --max-side 1500
+    python compress_text_image.py input.png --target-kb 80 --max-side 1300
+    python compress_text_image.py input.png --format auto
     python compress_text_image.py input.png --aggressive
     python compress_text_image.py input.png --grayscale
 """
@@ -219,7 +221,7 @@ def generate_long_sides(
 ) -> list[int]:
     """
     生成逐步缩小的最长边列表。
-    默认从 1500 或原图较小最长边开始，逐步缩小到 min_long_side。
+    默认从 1300 或原图较小最长边开始，逐步缩小到 min_long_side。
     """
     min_long_side = min(min_long_side, base_long_side)
     min_long_side = max(1, min_long_side)
@@ -480,7 +482,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     )
     parser.add_argument("input", help="输入图片路径，例如 input.png")
     parser.add_argument("-o", "--output", help="输出文件路径或目录；不填则自动生成")
-    parser.add_argument("--max-side", type=positive_int, default=1500, help="最长边上限，默认 1500")
+    parser.add_argument("--max-side", type=positive_int, default=1300, help="最长边上限，默认 1300")
     parser.add_argument("--target-kb", type=positive_int, default=80, help="目标体积 KB，默认 80")
     parser.add_argument(
         "--min-quality",
@@ -491,8 +493,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument(
         "--min-long-side",
         type=positive_int,
-        default=600,
-        help="默认不会把最长边压到低于此值，默认 600；原图更小时不放大",
+        default=None,
+        help="手动指定最低最长边；默认不限制，原图更小时不放大",
     )
     parser.add_argument(
         "--scale-step",
@@ -502,9 +504,9 @@ def main(argv: Optional[list[str]] = None) -> int:
     )
     parser.add_argument(
         "--format",
-        default="auto",
+        default=None,
         choices=["auto", "webp", "png", "jpeg", "jpg"],
-        help="输出格式，默认 auto 自动选择",
+        help="输出格式，默认 jpg；未指定时会优先使用输出路径后缀",
     )
     parser.add_argument(
         "--grayscale",
@@ -520,7 +522,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument(
         "--aggressive",
         action="store_true",
-        help="更激进地追求 50KB：降低默认最低质量和最低最长边",
+        help="更激进地追求 50KB：降低默认最低质量",
     )
 
     args = parser.parse_args(argv)
@@ -535,20 +537,22 @@ def main(argv: Optional[list[str]] = None) -> int:
         return 2
 
     target_bytes = args.target_kb * 1024
-    allowed_formats = parse_format_arg(args.format)
 
-    # 如果用户指定了输出后缀但没有显式指定 --format，则尊重输出后缀。
+    # 显式 --format 优先；否则如果用户指定了输出后缀，则尊重输出后缀。
     # 例如：-o outputs/example_out.jpg 应输出真正的 JPEG，而不是 WebP 内容 + .jpg 后缀。
     output_fmt = format_from_suffix(args.output)
-    if args.format == "auto" and output_fmt is not None:
+    if args.format is not None:
+        allowed_formats = parse_format_arg(args.format)
+    elif output_fmt is not None:
         allowed_formats = {output_fmt}
+    else:
+        allowed_formats = parse_format_arg("jpg")
 
     min_quality = min(args.min_quality, 95)
-    min_long_side = args.min_long_side
+    min_long_side = args.min_long_side if args.min_long_side is not None else 1
 
     if args.aggressive:
         min_quality = min(min_quality, 30)
-        min_long_side = min(min_long_side, 420)
 
     try:
         with Image.open(input_path) as img:
@@ -600,13 +604,19 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     if not success:
         print()
-        print("提示：在当前“最低质量/最低尺寸”约束下，未能压到目标体积以内。")
+        if args.min_long_side is not None:
+            print("提示：在当前“最低质量/最低尺寸”约束下，未能压到目标体积以内。")
+        else:
+            print("提示：在当前“最低质量”约束下，未能压到目标体积以内。")
         print("你可以尝试：")
         print("  1. 添加 --aggressive")
         print("  2. 添加 --grayscale")
         print("  3. 降低 --min-quality，例如 --min-quality 30")
-        print("  4. 降低 --min-long-side，例如 --min-long-side 420")
-        print("  5. 适当提高 --target-kb，例如 --target-kb 80")
+        if args.min_long_side is not None:
+            print("  4. 降低或移除 --min-long-side")
+            print("  5. 适当提高 --target-kb，例如 --target-kb 80")
+        else:
+            print("  4. 适当提高 --target-kb，例如 --target-kb 80")
 
     return 0
 
