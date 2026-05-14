@@ -154,6 +154,12 @@ stop_old_backend() {
     return 0
   fi
 
+  if ps -p "$old_pid" >/dev/null 2>&1 && ! process_looks_like_backend "$old_pid"; then
+    log "PID 文件中的进程不是当前后端服务，移除陈旧 PID：$old_pid"
+    rm -f "$BACKEND_PID_FILE"
+    return 0
+  fi
+
   if ps -p "$old_pid" >/dev/null 2>&1; then
     log "停止旧的后台进程，PID：$old_pid"
     kill "$old_pid" || true
@@ -176,23 +182,42 @@ stop_old_backend() {
 }
 
 backend_is_running() {
+  local backend_pid
+
   if [[ ! -f "$BACKEND_PID_FILE" ]]; then
+    backend_pid="$(find_backend_pid || true)"
+    if [[ -n "$backend_pid" ]]; then
+      echo "$backend_pid" > "$BACKEND_PID_FILE"
+      return 0
+    fi
+
     return 1
   fi
 
-  local backend_pid
   backend_pid="$(cat "$BACKEND_PID_FILE" || true)"
 
   if [[ -z "$backend_pid" ]]; then
     rm -f "$BACKEND_PID_FILE"
+    backend_pid="$(find_backend_pid || true)"
+    if [[ -n "$backend_pid" ]]; then
+      echo "$backend_pid" > "$BACKEND_PID_FILE"
+      return 0
+    fi
+
     return 1
   fi
 
-  if ps -p "$backend_pid" >/dev/null 2>&1; then
+  if ps -p "$backend_pid" >/dev/null 2>&1 && process_looks_like_backend "$backend_pid"; then
     return 0
   fi
 
   rm -f "$BACKEND_PID_FILE"
+  backend_pid="$(find_backend_pid || true)"
+  if [[ -n "$backend_pid" ]]; then
+    echo "$backend_pid" > "$BACKEND_PID_FILE"
+    return 0
+  fi
+
   return 1
 }
 
@@ -235,24 +260,116 @@ run_after_npm_install_cmd() {
   fi
 }
 
-ensure_backend_running() {
-  if [[ "$ENABLE_AFTER_NPM_INSTALL_CMD" != "1" ]]; then
-    log "ENABLE_AFTER_NPM_INSTALL_CMD != 1，跳过后台服务检查"
-    return 0
+process_has_deploy_lock() {
+  local pid="$1"
+  local fd
+  local fd_target
+
+  [[ -d "/proc/$pid/fd" ]] || return 1
+
+  for fd in "/proc/$pid/fd/"*; do
+    [[ -e "$fd" ]] || continue
+
+    fd_target="$(readlink "$fd" 2>/dev/null || true)"
+    if [[ "$fd_target" == "$LOCK_FILE" || "$fd_target" == "$LOCK_FILE (deleted)" ]]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+process_cmdline() {
+  local pid="$1"
+
+  if [[ ! -r "/proc/$pid/cmdline" ]]; then
+    return 1
   fi
 
-  if [[ -z "$AFTER_NPM_INSTALL_CMD" ]]; then
-    log "AFTER_NPM_INSTALL_CMD 为空，跳过后台服务检查"
-    return 0
+  tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null || true
+}
+
+process_looks_like_backend() {
+  local pid="$1"
+  local cmdline
+
+  cmdline="$(process_cmdline "$pid")"
+  [[ -n "$cmdline" ]] || return 1
+
+  [[ "$cmdline" == *"uvicorn"* && "$cmdline" == *"app:app"* && "$cmdline" == *"8793"* ]]
+}
+
+find_backend_pid() {
+  local proc_dir
+  local backend_pid
+
+  for proc_dir in /proc/[0-9]*; do
+    [[ -d "$proc_dir" ]] || continue
+
+    backend_pid="${proc_dir##*/}"
+    if process_looks_like_backend "$backend_pid"; then
+      printf '%s\n' "$backend_pid"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+find_stale_backend_lock_pid() {
+  local backend_pid
+
+  if [[ -f "$BACKEND_PID_FILE" ]]; then
+    backend_pid="$(cat "$BACKEND_PID_FILE" || true)"
+
+    if [[ -z "$backend_pid" ]]; then
+      rm -f "$BACKEND_PID_FILE"
+    elif ps -p "$backend_pid" >/dev/null 2>&1 && process_has_deploy_lock "$backend_pid" && process_looks_like_backend "$backend_pid"; then
+      printf '%s\n' "$backend_pid"
+      return 0
+    elif ! ps -p "$backend_pid" >/dev/null 2>&1; then
+      rm -f "$BACKEND_PID_FILE"
+    fi
   fi
 
-  if backend_is_running; then
-    log "后台服务已运行，PID：$(cat "$BACKEND_PID_FILE")"
-    return 0
+  local proc_dir
+  for proc_dir in /proc/[0-9]*; do
+    [[ -d "$proc_dir" ]] || continue
+
+    backend_pid="${proc_dir##*/}"
+    if process_has_deploy_lock "$backend_pid" && process_looks_like_backend "$backend_pid"; then
+      printf '%s\n' "$backend_pid"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+release_stale_backend_deploy_lock() {
+  local backend_pid
+  backend_pid="$(find_stale_backend_lock_pid || true)"
+
+  [[ -n "$backend_pid" ]] || return 1
+
+  log "检测到旧后台进程仍持有部署锁，准备停止该进程，PID：$backend_pid" | tee -a "$LOG_FILE"
+  kill "$backend_pid" || true
+
+  for _ in {1..10}; do
+    if ps -p "$backend_pid" >/dev/null 2>&1; then
+      sleep 1
+    else
+      break
+    fi
+  done
+
+  if ps -p "$backend_pid" >/dev/null 2>&1; then
+    log "旧后台进程未正常退出，执行强制终止，PID：$backend_pid" | tee -a "$LOG_FILE"
+    kill -9 "$backend_pid" || true
   fi
 
-  log "未检测到正在运行的后台服务，将重新启动"
-  run_after_npm_install_cmd
+  rm -f "$BACKEND_PID_FILE"
+  return 0
 }
 
 build_project() {
@@ -288,12 +405,43 @@ publish_webroot() {
   log "发布完成"
 }
 
+run_deploy_steps() {
+  run_python_install
+  run_npm_install
+  run_after_npm_install_cmd
+  build_project
+  publish_webroot
+}
+
 #######################################
 # 主流程
 #######################################
 
 mkdir -p "$(dirname "$LOG_FILE")"
 touch "$LOG_FILE"
+
+if [[ "${GITEE_SITE_DEPLOY_LOCKED:-0}" != "1" ]]; then
+  need_cmd flock
+
+  for lock_attempt in 1 2; do
+    set +e
+    env GITEE_SITE_DEPLOY_LOCKED=1 flock -n -E 75 --close "$LOCK_FILE" bash "${BASH_SOURCE[0]}" "$@"
+    lock_rc=$?
+    set -e
+
+    if [[ "$lock_rc" -ne 75 ]]; then
+      exit "$lock_rc"
+    fi
+
+    if [[ "$lock_attempt" -eq 1 ]] && release_stale_backend_deploy_lock; then
+      log "已释放旧后台进程持有的部署锁，重新尝试部署" | tee -a "$LOG_FILE"
+      continue
+    fi
+
+    log "已有部署任务正在运行，本次退出" | tee -a "$LOG_FILE"
+    exit 0
+  done
+fi
 
 exec > >(tee -a "$LOG_FILE") 2>&1
 
@@ -325,12 +473,6 @@ fi
 [[ -n "$BRANCH" ]] || die "BRANCH 不能为空"
 [[ -n "$TARGET_DIR" ]] || die "TARGET_DIR 不能为空"
 
-exec 200>"$LOCK_FILE"
-flock -n 200 || {
-  log "已有部署任务正在运行，本次退出"
-  exit 0
-}
-
 log "========== 开始检查 Gitee 仓库 =========="
 log "仓库：$REPO_URL"
 log "分支：$BRANCH"
@@ -354,15 +496,39 @@ log "远程提交：$REMOTE_COMMIT"
 log "本地提交：${LOCAL_COMMIT:-无}"
 log "本地远程：${LOCAL_REMOTE:-无}"
 
+BACKEND_RUNNING="0"
+if backend_is_running; then
+  BACKEND_RUNNING="1"
+  log "检测到后端服务正在运行，PID：$(cat "$BACKEND_PID_FILE")"
+else
+  log "未检测到正在运行的后端服务"
+fi
+
+SOURCE_IS_CURRENT="0"
 if [[ "$FORCE" != "1" ]] && is_git_repo && [[ "$LOCAL_REMOTE" == "$REPO_URL" ]] && [[ "$LOCAL_COMMIT" == "$REMOTE_COMMIT" ]]; then
-  log "远程仓库没有新提交，无需更新和构建"
-  ensure_backend_running
+  SOURCE_IS_CURRENT="1"
+fi
+
+if [[ "$SOURCE_IS_CURRENT" == "1" && "$BACKEND_RUNNING" == "1" ]]; then
+  log "远程仓库没有新提交，后端服务已运行，无需部署"
   log "========== 结束 =========="
+  exit 0
+fi
+
+if [[ "$SOURCE_IS_CURRENT" == "1" && "$BACKEND_RUNNING" == "0" ]]; then
+  log "远程仓库没有新提交，但后端服务未运行，将复用本地源码执行完整部署流程"
+  run_deploy_steps
+  log "========== 部署成功 =========="
   exit 0
 fi
 
 if [[ "$FORCE" == "1" ]]; then
   log "检测到 FORCE=1，将强制覆盖并构建"
+fi
+
+if [[ "$BACKEND_RUNNING" == "1" ]]; then
+  log "需要更新源码，先完全停止正在运行的后端服务"
+  stop_old_backend
 fi
 
 if ! is_git_repo || [[ "$LOCAL_REMOTE" != "$REPO_URL" ]]; then
@@ -375,10 +541,6 @@ fi
 NEW_LOCAL_COMMIT="$(git -C "$TARGET_DIR" rev-parse HEAD)"
 log "同步后的本地提交：$NEW_LOCAL_COMMIT"
 
-run_python_install
-run_npm_install
-run_after_npm_install_cmd
-build_project
-publish_webroot
+run_deploy_steps
 
 log "========== 部署成功 =========="
