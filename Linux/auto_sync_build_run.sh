@@ -15,7 +15,7 @@ BRANCH="master"
 TARGET_DIR="./src"
 
 # Python 依赖安装命令
-PYTHON_INSTALL_CMD="/opt/compress-image/venv/bin/pip3 install -r ./src/requirements.txt"
+PYTHON_INSTALL_CMD="/opt/compress-image/venv/bin/pip3 install -r requirements.txt"
 
 # npm 依赖安装命令
 # 生产环境如果有 package-lock.json，更推荐改成：npm ci
