@@ -11,18 +11,18 @@ REPO_URL="https://gitee.com/shallowspider/compress-image_py_web.git"
 # 远程分支
 BRANCH="master"
 
-# 本地源码目录
-TARGET_DIR="./src"
+# 本地源码目录，必须用绝对路径
+TARGET_DIR="/opt/compress-image/src"
 
 # Python 依赖安装命令
 PYTHON_INSTALL_CMD="/opt/compress-image/venv/bin/pip3 install -r requirements.txt"
 
 # npm 依赖安装命令
 # 生产环境如果有 package-lock.json，更推荐改成：npm ci
-NPM_INSTALL_CMD="npm ci"
+NPM_INSTALL_CMD="cd web && npm ci"
 
 # npm 构建命令
-BUILD_CMD="npm run build"
+BUILD_CMD="cd web && npm run build"
 
 # npm install 成功后执行的命令
 # 注意：uvicorn 是常驻进程，脚本会以后台方式启动它，避免阻塞后续构建。
@@ -42,7 +42,7 @@ BACKEND_LOG_FILE="/var/log/gitee-site-uvicorn.log"
 BUILD_OUTPUT_DIR="web/dist"
 
 # Web 服务目录。留空则只构建，不发布。
-WEB_ROOT="/opt/1panel/www/sites/ci.clicli.asia/index"
+WEB_ROOT=""
 
 # 部署日志和锁文件
 LOG_FILE="/var/log/gitee-site-deploy.log"
