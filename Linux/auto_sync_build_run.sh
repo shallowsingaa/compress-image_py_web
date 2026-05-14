@@ -175,6 +175,27 @@ stop_old_backend() {
   rm -f "$BACKEND_PID_FILE"
 }
 
+backend_is_running() {
+  if [[ ! -f "$BACKEND_PID_FILE" ]]; then
+    return 1
+  fi
+
+  local backend_pid
+  backend_pid="$(cat "$BACKEND_PID_FILE" || true)"
+
+  if [[ -z "$backend_pid" ]]; then
+    rm -f "$BACKEND_PID_FILE"
+    return 1
+  fi
+
+  if ps -p "$backend_pid" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  rm -f "$BACKEND_PID_FILE"
+  return 1
+}
+
 run_after_npm_install_cmd() {
   if [[ "$ENABLE_AFTER_NPM_INSTALL_CMD" != "1" ]]; then
     log "ENABLE_AFTER_NPM_INSTALL_CMD != 1，跳过 npm install 后置命令"
@@ -212,6 +233,26 @@ run_after_npm_install_cmd() {
     rm -f "$BACKEND_PID_FILE"
     die "后置命令启动失败，请查看日志：$BACKEND_LOG_FILE"
   fi
+}
+
+ensure_backend_running() {
+  if [[ "$ENABLE_AFTER_NPM_INSTALL_CMD" != "1" ]]; then
+    log "ENABLE_AFTER_NPM_INSTALL_CMD != 1，跳过后台服务检查"
+    return 0
+  fi
+
+  if [[ -z "$AFTER_NPM_INSTALL_CMD" ]]; then
+    log "AFTER_NPM_INSTALL_CMD 为空，跳过后台服务检查"
+    return 0
+  fi
+
+  if backend_is_running; then
+    log "后台服务已运行，PID：$(cat "$BACKEND_PID_FILE")"
+    return 0
+  fi
+
+  log "未检测到正在运行的后台服务，将重新启动"
+  run_after_npm_install_cmd
 }
 
 build_project() {
@@ -315,6 +356,7 @@ log "本地远程：${LOCAL_REMOTE:-无}"
 
 if [[ "$FORCE" != "1" ]] && is_git_repo && [[ "$LOCAL_REMOTE" == "$REPO_URL" ]] && [[ "$LOCAL_COMMIT" == "$REMOTE_COMMIT" ]]; then
   log "远程仓库没有新提交，无需更新和构建"
+  ensure_backend_running
   log "========== 结束 =========="
   exit 0
 fi
