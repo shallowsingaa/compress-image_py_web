@@ -301,6 +301,7 @@ function App() {
               <RotateCcw aria-hidden="true" />
               <span>重置</span>
             </button>
+            <p className="hint-text"><em>若显示 Failed to Fetch，请尝试刷新网页！！</em></p>
           </div>
         </div>
 
