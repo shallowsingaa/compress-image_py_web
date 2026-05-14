@@ -15,7 +15,7 @@ BRANCH="master"
 TARGET_DIR="./src"
 
 # Python 依赖安装命令
-PYTHON_INSTALL_CMD="pip3 install -r ./src/requirements.txt"
+PYTHON_INSTALL_CMD="/opt/compress-image/venv/pip3 install -r ./src/requirements.txt"
 
 # npm 依赖安装命令
 # 生产环境如果有 package-lock.json，更推荐改成：npm ci
@@ -26,7 +26,7 @@ BUILD_CMD="npm run build"
 
 # npm install 成功后执行的命令
 # 注意：uvicorn 是常驻进程，脚本会以后台方式启动它，避免阻塞后续构建。
-AFTER_NPM_INSTALL_CMD="python3 -m uvicorn app:app --host 0.0.0.0 --port 8793"
+AFTER_NPM_INSTALL_CMD="/opt/compress-image/venv/python3 -m uvicorn app:app --host 0.0.0.0 --port 8793"
 
 # 执行 AFTER_NPM_INSTALL_CMD 的工作目录
 AFTER_NPM_INSTALL_WORKDIR="$TARGET_DIR"
