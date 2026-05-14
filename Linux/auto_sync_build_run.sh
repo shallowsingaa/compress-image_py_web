@@ -42,7 +42,7 @@ BACKEND_LOG_FILE="/var/log/gitee-site-uvicorn.log"
 BUILD_OUTPUT_DIR="web/dist"
 
 # Web 服务目录。留空则只构建，不发布。
-WEB_ROOT=""
+WEB_ROOT="/opt/1panel/www/sites/ci.clicli.asia/index"
 
 # 部署日志和锁文件
 LOG_FILE="/var/log/gitee-site-deploy.log"
