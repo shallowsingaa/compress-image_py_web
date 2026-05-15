@@ -124,6 +124,15 @@ function App() {
   });
   const inputRef = useRef<HTMLInputElement | null>(null);
 
+  // Register Service Worker to fix APK Content-Type on mobile browsers
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker
+        .register('/apk-sw.js')
+        .catch((err) => console.warn('[apk-sw] registration failed', err));
+    }
+  }, []);
+
   const progress = useMemo(() => {
     if (!job || job.total === 0) return 0;
     return Math.round(((job.completed + job.failed) / job.total) * 100);
@@ -562,7 +571,6 @@ function DownloadPanelBody({ device }: { device: DeviceCategory }) {
             <a
               className={`app-download__item${isAndroid && index === 0 ? ' is-primary' : ''}`}
               href={pkg.url}
-              download
               rel="noopener"
             >
               <div className="app-download__item-text">

@@ -20,6 +20,20 @@ This repository is a runnable image compression web app. Keep changes aligned wi
 - Frontend `VITE_API_BASE_URL` controls API origin. When unset, requests go to same-origin `/api`.
 - Production deployment either needs a reverse proxy from `/api` to the FastAPI backend or a build-time `VITE_API_BASE_URL`.
 
+## Agent skills
+
+### Issue tracker
+
+Issues live as markdown files under `.scratch/`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Local markdown convention — `Status:` field in each issue file. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `CONTEXT.md` at repo root, `docs/adr/` for architectural decisions. See `docs/agents/domain.md`.
+
 ## Verification
 
 Use these checks after relevant changes:
