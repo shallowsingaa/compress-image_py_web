@@ -9,7 +9,9 @@ import {
   Loader2,
   RotateCcw,
   Settings2,
+  Smartphone,
   UploadCloud,
+  X,
   XCircle,
 } from 'lucide-react';
 import './styles.css';
@@ -55,6 +57,56 @@ type Options = {
 };
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '';
+
+type DeviceCategory = 'android' | 'harmonyos' | 'ios' | 'desktop';
+
+type ApkPackage = {
+  arch: string;
+  url: string;
+  description: string;
+};
+
+const APK_PACKAGES: ApkPackage[] = [
+  {
+    arch: 'arm64-v8a',
+    url: 'https://gitee.com/shallowspider/compress-image_flutter/releases/download/v1.0.1/compress-image_arm64-v8a.apk',
+    description: '推荐 · 适合近 6 年的主流安卓手机',
+  },
+  {
+    arch: 'armeabi-v7a',
+    url: 'https://gitee.com/shallowspider/compress-image_flutter/releases/download/v1.0.1/compress-image_armeabi-v7a.apk',
+    description: '适合较早期的 32 位安卓设备',
+  },
+  {
+    arch: 'x86_64',
+    url: 'https://gitee.com/shallowspider/compress-image_flutter/releases/download/v1.0.1/compress-image_x86_64.apk',
+    description: '适合安卓模拟器或 x86 平板',
+  },
+];
+
+function detectDevice(): DeviceCategory {
+  if (typeof navigator === 'undefined') return 'desktop';
+  const ua = navigator.userAgent || '';
+
+  if (
+    /iPhone|iPad|iPod/i.test(ua) ||
+    (navigator.platform === 'MacIntel' &&
+      typeof (navigator as Navigator & { maxTouchPoints?: number }).maxTouchPoints === 'number' &&
+      (navigator as Navigator & { maxTouchPoints: number }).maxTouchPoints > 1)
+  ) {
+    return 'ios';
+  }
+
+  if (/OpenHarmony|ArkWeb/i.test(ua) || (/HarmonyOS/i.test(ua) && !/Android/i.test(ua))) {
+    return 'harmonyos';
+  }
+
+  if (/Android/i.test(ua)) {
+    return 'android';
+  }
+
+  return 'desktop';
+}
 
 function App() {
   const [files, setFiles] = useState<File[]>([]);
@@ -165,6 +217,7 @@ function App() {
 
   return (
     <main className="shell">
+      <DownloadAppLauncher />
       <section className="workspace" aria-label="图片批量压缩工作台">
         <div className="control-pane">
           <div className="masthead">
@@ -392,6 +445,137 @@ function EmptyState() {
       <ImagePlus aria-hidden="true" />
       <p>上传图片后，这里会显示每张图的压缩状态和下载入口。</p>
     </div>
+  );
+}
+
+function DownloadAppLauncher() {
+  const [open, setOpen] = useState(false);
+  const [device, setDevice] = useState<DeviceCategory>('desktop');
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    setDevice(detectDevice());
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(event: MouseEvent) {
+      const target = event.target as Node;
+      if (panelRef.current?.contains(target) || triggerRef.current?.contains(target)) return;
+      setOpen(false);
+    }
+    function handleKey(event: KeyboardEvent) {
+      if (event.key === 'Escape') setOpen(false);
+    }
+    document.addEventListener('mousedown', handleClick);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [open]);
+
+  return (
+    <div className="app-download">
+      <button
+        ref={triggerRef}
+        className="app-download__trigger"
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        aria-haspopup="dialog"
+      >
+        <Smartphone aria-hidden="true" />
+        <span>下载 APP</span>
+      </button>
+
+      {open && (
+        <div
+          ref={panelRef}
+          className="app-download__panel"
+          role="dialog"
+          aria-label="下载图片批量压缩 APP"
+        >
+          <header className="app-download__head">
+            <p className="eyebrow">原生应用</p>
+            <h3>{panelHeading(device)}</h3>
+            <button
+              type="button"
+              className="app-download__close"
+              onClick={() => setOpen(false)}
+              aria-label="关闭"
+            >
+              <X aria-hidden="true" />
+            </button>
+          </header>
+          <DownloadPanelBody device={device} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function panelHeading(device: DeviceCategory) {
+  if (device === 'ios') return '哎呀，iOS 还没来';
+  if (device === 'harmonyos') return '纯鸿蒙正在打磨';
+  if (device === 'android') return '挑一个适合的版本';
+  return '装到你的安卓手机上';
+}
+
+function DownloadPanelBody({ device }: { device: DeviceCategory }) {
+  if (device === 'ios') {
+    return (
+      <div className="app-download__note">
+        <p>你好呀，iPhone 用户~</p>
+        <p>
+          我们暂时还没有 iOS 版本。网页版的功能其实一模一样，
+          先在 Safari 里压缩着用，等我们攒够心意再给你一个原生惊喜。
+        </p>
+      </div>
+    );
+  }
+
+  if (device === 'harmonyos') {
+    return (
+      <div className="app-download__note">
+        <p>你好呀，纯鸿蒙伙伴~</p>
+        <p>
+          纯血 HarmonyOS NEXT 的原生版本还在加紧打磨。
+          网页版功能完全够用，先在浏览器里凑合一下，我们尽快奉上。
+        </p>
+      </div>
+    );
+  }
+
+  const isAndroid = device === 'android';
+  const lead = isAndroid
+    ? '已识别到你正在使用 Android 设备，按手机芯片架构挑一个即可。'
+    : '想把它装到安卓手机上？根据手机 CPU 架构挑一个安装包。';
+
+  return (
+    <>
+      <p className="app-download__lead">{lead}</p>
+      <ul className="app-download__list">
+        {APK_PACKAGES.map((pkg, index) => (
+          <li key={pkg.arch}>
+            <a
+              className={`app-download__item${isAndroid && index === 0 ? ' is-primary' : ''}`}
+              href={pkg.url}
+              download
+              rel="noopener"
+            >
+              <div className="app-download__item-text">
+                <strong>{pkg.arch}</strong>
+                <span>{pkg.description}</span>
+              </div>
+              <Download aria-hidden="true" />
+            </a>
+          </li>
+        ))}
+      </ul>
+      <p className="app-download__foot">不确定?多数 2019 年以后的安卓手机选 arm64-v8a 就好。</p>
+    </>
   );
 }
 
