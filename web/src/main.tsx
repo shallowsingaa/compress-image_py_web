@@ -874,9 +874,13 @@ async function buildCompressedClipboardItems(jobId: string, files: JobFile[]) {
 
   for (const file of files) {
     const { blob, mime } = await fetchCompressedBlob(jobId, file);
-    const clipboardBlob = clipboardSupportsMime(mime)
-      ? new Blob([blob], { type: mime })
-      : await convertImageBlobToPng(blob);
+    if (!clipboardSupportsMime(mime)) {
+      throw new Error(
+        `浏览器剪贴板不支持写入 ${mimeToFormatLabel(mime)}，不能在保持输出格式的前提下复制；请使用下载入口，或把输出格式改为 PNG 后重试`,
+      );
+    }
+
+    const clipboardBlob = new Blob([blob], { type: mime });
     items.push(new ClipboardItem({ [clipboardBlob.type]: clipboardBlob }));
   }
 
@@ -896,7 +900,7 @@ async function fetchCompressedBlob(jobId: string, file: JobFile) {
 }
 
 function normalizeImageMime(headerMime?: string, outputFormat?: string | null, blobType?: string) {
-  const candidates = [headerMime, blobType, formatToMime(outputFormat)];
+  const candidates = [formatToMime(outputFormat), blobType, headerMime];
   return candidates.find((type) => type?.startsWith('image/')) ?? 'image/png';
 }
 
@@ -912,32 +916,14 @@ function clipboardSupportsMime(type: string) {
   const ClipboardItemWithSupports = ClipboardItem as typeof ClipboardItem & {
     supports?: (type: string) => boolean;
   };
-  return ClipboardItemWithSupports.supports ? ClipboardItemWithSupports.supports(type) : type === 'image/png';
+  return ClipboardItemWithSupports.supports ? ClipboardItemWithSupports.supports(type) : true;
 }
 
-async function convertImageBlobToPng(blob: Blob) {
-  const bitmap = await createImageBitmap(blob);
-  const canvas = document.createElement('canvas');
-  canvas.width = bitmap.width;
-  canvas.height = bitmap.height;
-  const context = canvas.getContext('2d');
-  if (!context) {
-    bitmap.close();
-    throw new Error('浏览器无法创建图片画布');
-  }
-
-  context.drawImage(bitmap, 0, 0);
-  bitmap.close();
-
-  return new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((pngBlob) => {
-      if (pngBlob) {
-        resolve(pngBlob);
-      } else {
-        reject(new Error('图片转换为 PNG 失败'));
-      }
-    }, 'image/png');
-  });
+function mimeToFormatLabel(type: string) {
+  if (type === 'image/jpeg') return 'JPG';
+  if (type === 'image/webp') return 'WebP';
+  if (type === 'image/png') return 'PNG';
+  return type;
 }
 
 function clipboardErrorMessage(err: unknown, fallback: string) {
