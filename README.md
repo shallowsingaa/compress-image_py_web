@@ -1,6 +1,6 @@
 # 图片批量压缩工具
 
-以文字为主的图片（文档截图、表单、证书等）批量压缩工具，提供 CLI 和网页版两种使用方式。
+以文字为主的图片（文档截图、表单、证书等）批量压缩工具，提供 CLI 和网页版两种使用方式。CLI 在 Windows 上还支持直接处理剪贴板图片。
 
 ## 目录
 
@@ -25,10 +25,21 @@ python -m pip install -r requirements.txt
 python main.py 输入图片.png
 ```
 
+Windows 剪贴板模式：
+
+```bash
+python main.py --clipboard
+python main.py --clipboard -o outputs/from_clipboard --format png
+```
+
+剪贴板模式会读取截图图片，或读取在资源管理器中复制的一张或多张图片文件。压缩结果会保存到 `outputs/clipboard/`；如果 `-o` 指向目录，则保存到该目录下的 `clipboard/`；如果 `-o` 指向文件名，则保存到该文件所在目录下的 `clipboard/`。处理成功后，CLI 会把压缩后的输出文件作为一组文件复制回 Windows 剪贴板。
+
 ### 参数说明
 
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
+| `input` | 无 | 输入图片路径；使用 `--clipboard` 时可省略 |
+| `--clipboard` | `false` | Windows 专用：从剪贴板读取图片，处理成功后复制结果回剪贴板 |
 | `--target-kb` | `80` | 目标文件体积（KB），尽量不超过此值 |
 | `--max-side` | `1300` | 最长边像素上限，不放大原图 |
 | `--format` | `jpg` | 输出格式：`auto`/`webp`/`png`/`jpeg`/`jpg` |
@@ -279,8 +290,9 @@ rm /tmp/gitee-site-deploy.lock
 ```
 .
 ├── app.py                       # FastAPI 后端（内存任务队列）
+├── clipboard_io.py              # Windows 剪贴板图片读写
 ├── compress_core.py             # CLI 和 API 共用的压缩核心逻辑
-├── main.py                      # 命令行入口
+├── main.py                      # 命令行入口（文件路径和 Windows 剪贴板模式）
 ├── requirements.txt             # Python 依赖
 ├── tests/                       # Python 单元测试
 ├── web/                         # React 前端源码

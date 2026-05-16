@@ -6,7 +6,7 @@ This project has three entry points over one compression core:
 
 - Web API: `app.py` exposes FastAPI routes for batch jobs and downloads.
 - Frontend: `web/src/main.tsx` uploads images, polls job status, and opens download routes.
-- CLI: `main.py` calls the same core functions for single-file compression.
+- CLI: `main.py` calls the same core functions for single-file compression and Windows clipboard batches.
 
 `compress_core.py` owns image processing. Keep new compression behavior in this module first, then expose it through the API, CLI, and frontend as needed.
 
@@ -18,6 +18,19 @@ This project has three entry points over one compression core:
 4. `compress_core.py` opens the image with Pillow, applies EXIF transpose, constrains longest side, generates candidates across formats, quality levels, palette settings, and downscaled dimensions, then chooses the best candidate.
 5. The frontend polls `GET /api/jobs/{job_id}` until the job is `done`.
 6. Successful files can be downloaded individually or as `download.zip`.
+
+CLI file-path flow:
+
+1. `main.py` builds `CompressOptions` from argparse values.
+2. `compress_image_file()` compresses the input path and writes the output path chosen by `compress_core.py`.
+3. The CLI prints the same result metadata returned by the shared core.
+
+CLI Windows clipboard flow:
+
+1. `main.py --clipboard` calls `clipboard_io.read_clipboard_images()`.
+2. `clipboard_io.py` reads copied image files from `CF_HDROP`, or screenshot bitmap data from `CF_DIB`.
+3. Each clipboard image is compressed through `compress_image_bytes()`.
+4. Outputs are saved under a `clipboard/` subdirectory and copied back to the Windows clipboard as an `CF_HDROP` file list.
 
 ## Compression Strategy
 
@@ -64,3 +77,4 @@ The frontend defines API response types directly in `web/src/main.tsx`. Backend 
 - Any origin is currently allowed by CORS.
 - Background jobs run inside the FastAPI process rather than through a durable queue.
 - There is no file expiry API because there is no persistent file store.
+- CLI clipboard mode is Windows-only and depends on the native clipboard APIs exposed through `ctypes`.

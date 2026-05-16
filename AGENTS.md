@@ -6,6 +6,7 @@ This repository is a runnable image compression web app. Keep changes aligned wi
 
 - `compress_core.py` is the shared compression implementation for both the CLI and API.
 - `main.py` is the CLI entry point and should stay behaviorally consistent with the shared core.
+- `clipboard_io.py` contains Windows-only clipboard image/file-list interop for the CLI `--clipboard` mode.
 - `app.py` exposes the FastAPI API and stores jobs in process memory.
 - `web/` is a Vite + React + TypeScript frontend.
 - `Linux/auto_sync_build_run.sh` is the deployment script for the Gitee-hosted production flow.
@@ -49,6 +50,7 @@ For narrow Python-only changes, `pytest` is the minimum useful gate. For fronten
 ## Editing Guidance
 
 - Preserve Chinese UI and error messages unless the user asks to rewrite copy.
+- Keep Windows clipboard behavior isolated in `clipboard_io.py`; non-Windows callers should receive a clear `ClipboardError`.
 - Prefer updating `CompressOptions` and tests together when adding compression parameters.
 - Keep API response field names stable; the React types in `web/src/main.tsx` depend on them.
 - Do not document the frontend as defaulting to `127.0.0.1:8793`; that only happens when `VITE_API_BASE_URL` is set.
