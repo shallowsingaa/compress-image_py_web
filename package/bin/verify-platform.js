@@ -4,7 +4,6 @@ const fs = require('fs');
 
 const RESOURCE_MAP = {
   win32: { dir: 'win', exe: 'compress-image.exe' },
-  darwin: { dir: 'mac', exe: 'compress-image' },
   linux: { dir: 'linux', exe: 'compress-image' },
 };
 

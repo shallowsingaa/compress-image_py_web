@@ -21,14 +21,13 @@ compress-image --target-kb 50 --aggressive input.png
 
 ## 平台支持
 
-- Windows: 完整支持，包括剪贴板功能
-- macOS/Linux: 完整支持，剪贴板功能禁用
+- **Windows**: 完整支持，包括剪贴板功能
+- **Linux**: 完整支持，剪贴板功能禁用
 
 ## 构建
 
 ```bash
 npm run build:win    # Windows
-npm run build:mac    # macOS
 npm run build:linux  # Linux
 npm run build:all    # 全部平台
 ```
