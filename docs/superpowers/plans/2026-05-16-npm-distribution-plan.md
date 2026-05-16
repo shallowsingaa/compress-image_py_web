@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Status 2026-05-16:** Implemented and reconciled. Treat this file as historical execution context. The current authoritative npm package docs are `docs/npm-package.md` and `package/PUBLISHING.md`.
+
 **Goal:** 将 Python CLI 工具通过 npm 全局包分发，用户只需 `npm install -g compress-img-cli` 即可使用 `compress-img` 命令。
 
 **Architecture:** Node.js 启动器检测平台并调用 PyInstaller 捆绑的 Python 可执行文件，实现真正的零配置跨平台分发。仅支持 Windows 和 Linux。
@@ -220,7 +222,7 @@ Run: `mkdir -p scripts/build`
 
 $ErrorActionPreference = "Stop"
 
-$ProjectRoot = Split-Path -Parent $PSScriptRoot
+$ProjectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $PackageDir = Join-Path $ProjectRoot "package"
 $ResourcesDir = Join-Path $PackageDir "resources\win"
 $SpecFile = Join-Path $PSScriptRoot "win.spec"
@@ -260,7 +262,7 @@ Run: Write to `scripts/build/win.ps1`
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 PACKAGE_DIR="$PROJECT_ROOT/package"
 RESOURCES_DIR="$PACKAGE_DIR/resources/linux"
 SPEC_FILE="$SCRIPT_DIR/linux.spec"
@@ -307,7 +309,7 @@ a = Analysis(
     noarchive=False,
 )
 
-pyz = PYZ(a.pure, a.binaries, cipher=block_cipher)
+pyz = PYZ(a.pure, cipher=block_cipher)
 
 exe = EXE(
     pyz,
@@ -353,7 +355,7 @@ a = Analysis(
     noarchive=False,
 )
 
-pyz = PYZ(a.pure, a.binaries, cipher=block_cipher)
+pyz = PYZ(a.pure, cipher=block_cipher)
 
 exe = EXE(
     pyz,
@@ -413,8 +415,8 @@ git commit -m "feat(build): add PyInstaller build scripts for Win/Linux"
   "engines": { "node": ">=16" },
   "scripts": {
     "postinstall": "node bin/verify-platform.js",
-    "build:win": "pwsh scripts/build/win.ps1",
-    "build:linux": "bash scripts/build/linux.sh",
+    "build:win": "powershell -ExecutionPolicy Bypass -File ../scripts/build/win.ps1",
+    "build:linux": "bash ../scripts/build/linux.sh",
     "build:all": "npm run build:win && npm run build:linux"
   }
 }
