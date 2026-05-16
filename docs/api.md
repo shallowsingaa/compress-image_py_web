@@ -30,6 +30,8 @@ Form fields:
 | `sharpness` | float | `1.10` | `1` disables extra sharpening |
 | `aggressive` | boolean | `false` | Lowers the effective minimum quality to at most `30` |
 
+PNG uploads are first normalized through a highest-quality JPEG intermediate before the existing compression candidate flow runs. Transparent pixels are flattened onto a white background; the final output format is still controlled by `output_format`.
+
 Example:
 
 ```powershell

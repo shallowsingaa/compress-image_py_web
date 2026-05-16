@@ -15,7 +15,7 @@ This project has three entry points over one compression core:
 1. The frontend sends `multipart/form-data` to `POST /api/jobs` with one or more `files` fields and compression options.
 2. `app.py` validates the form into `CompressOptions`, stores a `Job` with `JobFile` entries in `_jobs`, and schedules background processing.
 3. `_process_job()` calls `compress_image_bytes()` for each upload.
-4. `compress_core.py` opens the image with Pillow, applies EXIF transpose, constrains longest side, generates candidates across formats, quality levels, palette settings, and downscaled dimensions, then chooses the best candidate.
+4. `compress_core.py` opens the image with Pillow, applies EXIF transpose, converts PNG inputs through a highest-quality JPEG intermediate, constrains longest side, generates candidates across formats, quality levels, palette settings, and downscaled dimensions, then chooses the best candidate.
 5. The frontend polls `GET /api/jobs/{job_id}` until the job is `done`.
 6. Successful files can be downloaded individually or as `download.zip`.
 
@@ -24,6 +24,7 @@ This project has three entry points over one compression core:
 The core implementation is optimized for text-heavy images such as document photos, screenshots, forms, and certificates:
 
 - `resize_to_max_side()` limits the initial longest side without upscaling.
+- PNG inputs are flattened to RGB on a white background and re-opened from a highest-quality JPEG intermediate before candidate generation.
 - `generate_long_sides()` iteratively shrinks dimensions using `scale_step`.
 - `make_candidates()` tries WebP, PNG, and JPEG variants depending on `output_format`.
 - JPEG candidates include both 4:4:4 and 4:2:0 subsampling.
