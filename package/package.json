@@ -11,7 +11,9 @@
     "resources/",
     "HELP.md",
     "PUBLISHING.md",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "SUPPORT.md",
+    "SECURITY.md"
   ],
   "os": [ "win32", "linux" ],
   "engines": { "node": ">=16" },
@@ -34,7 +36,7 @@
   "bugs": {
     "url": "https://gitee.com/shallowspider/compress-image_py_web/issues"
   },
-  "author": "shallowsingmz",
+  "author": "ShallowSpider",
   "license": "MIT",
   "scripts": {
     "postinstall": "node bin/verify-platform.js",

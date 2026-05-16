@@ -41,6 +41,37 @@ For same-origin production, proxy:
 /api/* -> http://127.0.0.1:8793/api/*
 ```
 
+## npm Package Publishing
+
+The CLI npm package is published from `package/`, not from the repository root.
+
+Important package identifiers:
+
+| Item | Value |
+| --- | --- |
+| npm package | `compress-img-cli` |
+| installed command | `compress-img` |
+| Windows binary | `package/resources/win/compress-image.exe` |
+| Linux binary | `package/resources/linux/compress-image` |
+
+Build binaries before publishing:
+
+```powershell
+cd package
+npm run build:win
+npm pack --dry-run
+```
+
+Linux binary build must be run on Linux:
+
+```bash
+cd package
+npm run build:linux
+npm pack --dry-run
+```
+
+The generated binaries are release artifacts and are ignored by git. The authoritative release checklist is `package/PUBLISHING.md`; the project-level overview is `docs/npm-package.md`.
+
 ## Linux Auto Deploy Script
 
 `Linux/auto_sync_build_run.sh` is configured for a Gitee repository and a 1Panel-style static web root.

@@ -69,6 +69,8 @@ resources/
 HELP.md
 PUBLISHING.md
 CHANGELOG.md
+SUPPORT.md
+SECURITY.md
 README.md
 LICENSE
 package.json
@@ -95,6 +97,11 @@ npm pack --dry-run
 ```
 
 完整发布流程见 [PUBLISHING.md](./PUBLISHING.md)。
+
+## 支持和安全
+
+- 使用支持见 [SUPPORT.md](./SUPPORT.md)。
+- 安全报告方式见 [SECURITY.md](./SECURITY.md)。
 
 ## 许可证
 
