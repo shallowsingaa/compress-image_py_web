@@ -335,7 +335,7 @@ exe = EXE(
 
 Run: Write to `scripts/build/win.spec`
 
-- [ ] **Step 5: 创建 scripts/build/linux.spec`
+- [ ] **Step 5: 创建 scripts/build/linux.spec**
 
 ```python
 # -*- mode: python ; coding: utf-8 -*-
