@@ -1,4 +1,4 @@
-# compress-image-cli
+# compress-img-cli
 
 小而强的图片可控压缩工具 CLI 版。
 
@@ -7,16 +7,16 @@
 ## 安装
 
 ```bash
-npm install -g compress-image-cli
+npm install -g compress-img-cli
 ```
 
 ## 使用
 
 ```bash
-compress-image input.png
-compress-image -o output.webp input.png
-compress-image --clipboard
-compress-image --target-kb 50 --aggressive input.png
+compress-img input.png
+compress-img -o output.webp input.png
+compress-img --clipboard
+compress-img --target-kb 50 --aggressive input.png
 ```
 
 ## 平台支持
