@@ -96,23 +96,6 @@ def normalize_for_webp_or_png(img: Image.Image) -> Image.Image:
     return img.convert("RGB")
 
 
-def convert_png_to_jpeg_intermediate(img: Image.Image) -> Image.Image:
-    """将 PNG 输入转成最高质量 JPEG 中间态，再交给后续压缩流程。"""
-    jpg_img = flatten_to_rgb(img)
-    data = save_bytes(
-        jpg_img,
-        "JPEG",
-        quality=100,
-        optimize=True,
-        progressive=True,
-        subsampling=0,
-    )
-
-    with Image.open(io.BytesIO(data)) as converted:
-        converted.load()
-        return converted.copy()
-
-
 def resize_to_max_side(img: Image.Image, max_side: int) -> Image.Image:
     """等比例缩小图片，使最长边不超过 max_side；不会放大原图。"""
     width, height = img.size
@@ -486,11 +469,8 @@ def compress_image_bytes(
         min_quality = min(min_quality, 30)
 
     with Image.open(io.BytesIO(input_bytes)) as img:
-        input_format = (img.format or "").upper()
         img = ImageOps.exif_transpose(img)
         img.load()
-        if input_format == "PNG":
-            img = convert_png_to_jpeg_intermediate(img)
 
         original_width, original_height = img.size
         base_img = resize_to_max_side(img, options.max_side)

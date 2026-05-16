@@ -19,17 +19,6 @@ def make_image(fmt: str = "PNG", size: tuple[int, int] = (320, 180)) -> bytes:
     return buffer.getvalue()
 
 
-def make_transparent_png(size: tuple[int, int] = (120, 80)) -> bytes:
-    image = Image.new("RGBA", size, (0, 0, 0, 0))
-    for x in range(20, 100):
-        for y in range(20, 60):
-            image.putpixel((x, y), (220, 30, 30, 255))
-
-    buffer = io.BytesIO()
-    image.save(buffer, format="PNG")
-    return buffer.getvalue()
-
-
 @pytest.mark.parametrize(
     ("fmt", "filename", "output_format"),
     [
@@ -53,26 +42,6 @@ def test_compress_image_bytes_handles_common_formats(fmt: str, filename: str, ou
     assert max(result.output_width, result.output_height) <= 200
     assert result.output_filename.endswith(result.suffix)
     assert result.fmt in {"JPEG", "PNG", "WEBP"}
-
-
-def test_png_input_is_preconverted_to_jpeg_before_compression() -> None:
-    result = compress_image_bytes(
-        make_transparent_png(),
-        "transparent.png",
-        CompressOptions(
-            target_kb=80,
-            max_side=120,
-            output_format="png",
-            sharpness=1,
-        ),
-    )
-
-    assert result.fmt == "PNG"
-    with Image.open(io.BytesIO(result.data)) as output:
-        pixel = output.convert("RGBA").getpixel((0, 0))
-
-    assert pixel[3] == 255
-    assert pixel[:3] == (255, 255, 255)
 
 
 @pytest.mark.parametrize(
