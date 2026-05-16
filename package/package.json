@@ -13,8 +13,8 @@
   "engines": { "node": ">=16" },
   "scripts": {
     "postinstall": "node bin/verify-platform.js",
-    "build:win": "pwsh scripts/build/win.ps1",
-    "build:linux": "bash scripts/build/linux.sh",
+    "build:win": "powershell -ExecutionPolicy Bypass -File ../scripts/build/win.ps1",
+    "build:linux": "bash ../scripts/build/linux.sh",
     "build:all": "npm run build:win && npm run build:linux"
   }
 }

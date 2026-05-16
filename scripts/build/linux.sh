@@ -4,7 +4,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 PACKAGE_DIR="$PROJECT_ROOT/package"
 RESOURCES_DIR="$PACKAGE_DIR/resources/linux"
 SPEC_FILE="$SCRIPT_DIR/linux.spec"

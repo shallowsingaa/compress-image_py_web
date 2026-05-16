@@ -3,7 +3,7 @@
 
 $ErrorActionPreference = "Stop"
 
-$ProjectRoot = Split-Path -Parent $PSScriptRoot
+$ProjectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $PackageDir = Join-Path $ProjectRoot "package"
 $ResourcesDir = Join-Path $PackageDir "resources\win"
 $SpecFile = Join-Path $PSScriptRoot "win.spec"
