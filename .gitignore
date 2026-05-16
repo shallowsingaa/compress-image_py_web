@@ -5,3 +5,10 @@ __pycache__
 web/node_modules/
 web/dist/
 web/*.tsbuildinfo
+
+# npm package
+package/node_modules/
+package/resources/
+scripts/build/dist/
+scripts/build/build/
+*.spec.ejs
