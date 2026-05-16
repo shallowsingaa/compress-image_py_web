@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client';
 import {
   Archive,
   CheckCircle2,
+  Clipboard,
+  ClipboardCheck,
   Download,
   FileArchive,
   ImagePlus,
@@ -54,6 +56,13 @@ type Options = {
   minQuality: number;
   grayscale: boolean;
   aggressive: boolean;
+};
+
+type ClipboardTone = 'idle' | 'working' | 'success' | 'warning' | 'error';
+
+type ClipboardStatus = {
+  tone: ClipboardTone;
+  message: string;
 };
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '';
@@ -113,6 +122,13 @@ function App() {
   const [job, setJob] = useState<Job | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDesktopClipboard, setIsDesktopClipboard] = useState(false);
+  const [isCopyingClipboard, setIsCopyingClipboard] = useState(false);
+  const [clipboardJobId, setClipboardJobId] = useState<string | null>(null);
+  const [clipboardStatus, setClipboardStatus] = useState<ClipboardStatus>({
+    tone: 'idle',
+    message: '桌面端可粘贴截图或图片，压缩完成后会尝试复制结果。',
+  });
   const [error, setError] = useState('');
   const [options, setOptions] = useState<Options>({
     targetKb: 80,
@@ -123,6 +139,7 @@ function App() {
     aggressive: false,
   });
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const autoCopyJobRef = useRef<string | null>(null);
 
   const progress = useMemo(() => {
     if (!job || job.total === 0) return 0;
@@ -133,6 +150,12 @@ function App() {
     () => job?.files.filter((file) => file.status === 'done') ?? [],
     [job],
   );
+
+  const isBusy = isSubmitting || (!!job && job.status !== 'done');
+
+  useEffect(() => {
+    setIsDesktopClipboard(detectDevice() === 'desktop');
+  }, []);
 
   useEffect(() => {
     if (!job || job.status === 'done') return;
@@ -149,6 +172,38 @@ function App() {
     return () => window.clearInterval(timer);
   }, [job]);
 
+  useEffect(() => {
+    if (!isDesktopClipboard) return;
+
+    function handlePaste(event: ClipboardEvent) {
+      if (isEditableTarget(event.target)) return;
+      const pastedImages = extractImageFilesFromClipboardData(event.clipboardData);
+      if (!pastedImages.length) return;
+
+      event.preventDefault();
+      void startClipboardJob(pastedImages, 'paste');
+    }
+
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [isDesktopClipboard, isBusy, options]);
+
+  useEffect(() => {
+    if (!job || job.status !== 'done') return;
+    if (job.id !== clipboardJobId || autoCopyJobRef.current === job.id) return;
+
+    autoCopyJobRef.current = job.id;
+    if (!finishedFiles.length) {
+      setClipboardStatus({
+        tone: 'error',
+        message: '本批剪贴板图片没有成功结果，请查看失败原因或重新粘贴。',
+      });
+      return;
+    }
+
+    void copyFinishedFilesToClipboard('auto');
+  }, [job, clipboardJobId, finishedFiles]);
+
   function appendFiles(nextFiles: FileList | File[]) {
     const images = Array.from(nextFiles).filter((file) => file.type.startsWith('image/'));
     setFiles((current) => {
@@ -162,16 +217,12 @@ function App() {
     });
   }
 
-  async function submitJob() {
-    if (!files.length) {
-      setError('请先选择至少一张图片。');
-      return;
-    }
-
+  async function createJob(nextFiles: File[]) {
     setIsSubmitting(true);
     setError('');
+    setJob(null);
     const form = new FormData();
-    files.forEach((file) => form.append('files', file));
+    nextFiles.forEach((file) => form.append('files', file));
     form.append('target_kb', String(options.targetKb));
     form.append('max_side', String(options.maxSide));
     form.append('output_format', options.outputFormat);
@@ -185,10 +236,143 @@ function App() {
         body: form,
       });
       setJob(created);
+      return created;
     } catch (err) {
       setError(err instanceof Error ? err.message : '创建压缩任务失败');
+      throw err;
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  async function submitJob() {
+    if (!files.length) {
+      setError('请先选择至少一张图片。');
+      return;
+    }
+
+    setClipboardJobId(null);
+    autoCopyJobRef.current = null;
+    setClipboardStatus({
+      tone: 'idle',
+      message: '桌面端可粘贴截图或图片，压缩完成后会尝试复制结果。',
+    });
+
+    try {
+      await createJob(files);
+    } catch {
+      // createJob has already surfaced the error in the main error line.
+    }
+  }
+
+  async function startClipboardJob(nextFiles: File[], source: 'paste' | 'manual') {
+    if (isBusy) {
+      setClipboardStatus({
+        tone: 'warning',
+        message: '当前批次仍在处理中，完成后再粘贴新的图片。',
+      });
+      return;
+    }
+
+    const images = nextFiles.filter((file) => file.type.startsWith('image/'));
+    if (!images.length) {
+      setClipboardStatus({
+        tone: 'warning',
+        message: '剪贴板里没有可处理的图片。',
+      });
+      return;
+    }
+
+    setFiles(images);
+    setClipboardJobId(null);
+    autoCopyJobRef.current = null;
+    setClipboardStatus({
+      tone: 'working',
+      message: `${source === 'paste' ? '已粘贴' : '已读取'} ${images.length} 张图片，正在提交压缩。`,
+    });
+
+    try {
+      const created = await createJob(images);
+      setClipboardJobId(created.id);
+      setClipboardStatus({
+        tone: 'working',
+        message: `剪贴板批次已提交，等待 ${images.length} 张图片压缩完成。`,
+      });
+    } catch (err) {
+      setClipboardStatus({
+        tone: 'error',
+        message: err instanceof Error ? err.message : '剪贴板图片提交失败。',
+      });
+    }
+  }
+
+  async function readClipboardImages() {
+    if (isBusy) {
+      setClipboardStatus({
+        tone: 'warning',
+        message: '当前批次仍在处理中，完成后再读取剪贴板。',
+      });
+      return;
+    }
+
+    if (!window.isSecureContext || !navigator.clipboard?.read) {
+      setClipboardStatus({
+        tone: 'error',
+        message: '当前浏览器不允许读取剪贴板，请使用 HTTPS、localhost 或直接粘贴图片。',
+      });
+      return;
+    }
+
+    setClipboardStatus({ tone: 'working', message: '正在读取剪贴板图片。' });
+
+    try {
+      const clipboardItems = await navigator.clipboard.read();
+      const images = await extractImageFilesFromClipboardItems(clipboardItems);
+      await startClipboardJob(images, 'manual');
+    } catch (err) {
+      setClipboardStatus({
+        tone: 'error',
+        message: clipboardErrorMessage(err, '读取剪贴板失败'),
+      });
+    }
+  }
+
+  async function copyFinishedFilesToClipboard(trigger: 'auto' | 'manual') {
+    if (!job || !finishedFiles.length) return;
+
+    if (!window.isSecureContext || !navigator.clipboard?.write || typeof ClipboardItem === 'undefined') {
+      setClipboardStatus({
+        tone: 'error',
+        message: '当前浏览器不允许写入剪贴板，请使用 HTTPS、localhost，或改用下载按钮。',
+      });
+      return;
+    }
+
+    setIsCopyingClipboard(true);
+    setClipboardStatus({
+      tone: 'working',
+      message: trigger === 'auto' ? '压缩完成，正在复制结果到剪贴板。' : '正在复制压缩结果。',
+    });
+
+    try {
+      const clipboardItems = await buildCompressedClipboardItems(job.id, finishedFiles);
+      await navigator.clipboard.write(clipboardItems);
+      const multiNote =
+        clipboardItems.length > 1 ? '；系统或目标应用可能只接收第一张，下载入口仍保留' : '';
+      setClipboardStatus({
+        tone: clipboardItems.length > 1 ? 'warning' : 'success',
+        message: `已尝试复制 ${clipboardItems.length} 张压缩结果${multiNote}。`,
+      });
+    } catch (err) {
+      setClipboardStatus({
+        tone: 'error',
+        message: `${trigger === 'auto' ? '自动复制失败' : '复制失败'}：${clipboardErrorMessage(
+          err,
+          '可点击一键复制结果重试，或使用下载入口',
+        )}`,
+      });
+    } finally {
+      setIsCopyingClipboard(false);
     }
   }
 
@@ -196,6 +380,12 @@ function App() {
     setFiles([]);
     setJob(null);
     setError('');
+    setClipboardJobId(null);
+    autoCopyJobRef.current = null;
+    setClipboardStatus({
+      tone: 'idle',
+      message: '桌面端可粘贴截图或图片，压缩完成后会尝试复制结果。',
+    });
     if (inputRef.current) inputRef.current.value = '';
   }
 
@@ -243,8 +433,21 @@ function App() {
           >
             <UploadCloud aria-hidden="true" />
             <span>拖入图片，或点击选择</span>
-            <small>支持多选，非图片文件会自动忽略</small>
+            <small>
+              支持多选、拖拽
+              {isDesktopClipboard ? '，桌面端也可 Ctrl+V 粘贴截图或图片' : '，非图片文件会自动忽略'}
+            </small>
           </button>
+
+          {isDesktopClipboard && (
+            <div className="clipboard-entry">
+              <button type="button" onClick={readClipboardImages} disabled={isBusy}>
+                <Clipboard aria-hidden="true" />
+                <span>从剪贴板读取</span>
+              </button>
+              <span>粘贴会直接按当前参数新建批次</span>
+            </div>
+          )}
 
           <input
             ref={inputRef}
@@ -383,6 +586,29 @@ function App() {
               <span>下载 ZIP</span>
             </button>
           </div>
+
+          {isDesktopClipboard && (
+            <div className={`clipboard-strip clipboard-strip--${clipboardStatus.tone}`}>
+              {clipboardStatus.tone === 'success' ? (
+                <ClipboardCheck aria-hidden="true" />
+              ) : (
+                <Clipboard aria-hidden="true" />
+              )}
+              <span>{clipboardStatus.message}</span>
+              <button
+                type="button"
+                onClick={() => void copyFinishedFilesToClipboard('manual')}
+                disabled={!finishedFiles.length || isCopyingClipboard}
+              >
+                {isCopyingClipboard ? (
+                  <Loader2 className="spin" aria-hidden="true" />
+                ) : (
+                  <ClipboardCheck aria-hidden="true" />
+                )}
+                <span>{isCopyingClipboard ? '复制中' : '一键复制结果'}</span>
+              </button>
+            </div>
+          )}
 
           <div className="queue">
             {!job && <EmptyState />}
@@ -577,6 +803,148 @@ function DownloadPanelBody({ device }: { device: DeviceCategory }) {
       <p className="app-download__foot">不确定?多数 2019 年以后的安卓手机选 arm64-v8a 就好。</p>
     </>
   );
+}
+
+function isEditableTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false;
+  const editable = target.closest('input, textarea, select, [contenteditable="true"]');
+  return Boolean(editable);
+}
+
+function extractImageFilesFromClipboardData(data: DataTransfer | null) {
+  if (!data) return [];
+
+  const files = Array.from(data.files)
+    .filter((file) => file.type.startsWith('image/'))
+    .map((file, index) => normalizeClipboardFile(file, index));
+
+  if (files.length) return files;
+
+  return Array.from(data.items)
+    .filter((item) => item.kind === 'file' && item.type.startsWith('image/'))
+    .map((item, index) => {
+      const file = item.getAsFile();
+      return file ? normalizeClipboardFile(file, index, item.type) : null;
+    })
+    .filter((file): file is File => file !== null);
+}
+
+async function extractImageFilesFromClipboardItems(items: ClipboardItem[]) {
+  const images: File[] = [];
+
+  for (const item of items) {
+    const imageType = item.types.find((type) => type.startsWith('image/'));
+    if (!imageType) continue;
+
+    const blob = await item.getType(imageType);
+    images.push(
+      new File([blob], clipboardFileName(imageType, images.length), {
+        type: imageType,
+        lastModified: Date.now(),
+      }),
+    );
+  }
+
+  return images;
+}
+
+function normalizeClipboardFile(file: File, index: number, fallbackType?: string) {
+  const type = file.type || fallbackType || 'image/png';
+  if (file.name) {
+    return new File([file], file.name, { type, lastModified: file.lastModified || Date.now() });
+  }
+  return new File([file], clipboardFileName(type, index), { type, lastModified: Date.now() });
+}
+
+function clipboardFileName(type: string, index: number) {
+  const extension = typeToExtension(type);
+  const stamp = new Date().toISOString().replace(/[-:T.Z]/g, '').slice(0, 14);
+  return `clipboard-${stamp}-${index + 1}.${extension}`;
+}
+
+function typeToExtension(type: string) {
+  if (type === 'image/jpeg') return 'jpg';
+  if (type === 'image/webp') return 'webp';
+  if (type === 'image/gif') return 'gif';
+  return 'png';
+}
+
+async function buildCompressedClipboardItems(jobId: string, files: JobFile[]) {
+  const items: ClipboardItem[] = [];
+
+  for (const file of files) {
+    const { blob, mime } = await fetchCompressedBlob(jobId, file);
+    const clipboardBlob = clipboardSupportsMime(mime)
+      ? new Blob([blob], { type: mime })
+      : await convertImageBlobToPng(blob);
+    items.push(new ClipboardItem({ [clipboardBlob.type]: clipboardBlob }));
+  }
+
+  return items;
+}
+
+async function fetchCompressedBlob(jobId: string, file: JobFile) {
+  const response = await fetch(`${API_BASE}/api/jobs/${jobId}/files/${file.id}/download`);
+  if (!response.ok) {
+    throw new Error(`下载 ${file.output_filename ?? file.filename} 失败`);
+  }
+
+  const blob = await response.blob();
+  const headerMime = response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase();
+  const mime = normalizeImageMime(headerMime, file.output_format, blob.type);
+  return { blob, mime };
+}
+
+function normalizeImageMime(headerMime?: string, outputFormat?: string | null, blobType?: string) {
+  const candidates = [headerMime, blobType, formatToMime(outputFormat)];
+  return candidates.find((type) => type?.startsWith('image/')) ?? 'image/png';
+}
+
+function formatToMime(format?: string | null) {
+  const normalized = format?.toLowerCase();
+  if (normalized === 'jpg' || normalized === 'jpeg') return 'image/jpeg';
+  if (normalized === 'webp') return 'image/webp';
+  if (normalized === 'png') return 'image/png';
+  return null;
+}
+
+function clipboardSupportsMime(type: string) {
+  const ClipboardItemWithSupports = ClipboardItem as typeof ClipboardItem & {
+    supports?: (type: string) => boolean;
+  };
+  return ClipboardItemWithSupports.supports ? ClipboardItemWithSupports.supports(type) : type === 'image/png';
+}
+
+async function convertImageBlobToPng(blob: Blob) {
+  const bitmap = await createImageBitmap(blob);
+  const canvas = document.createElement('canvas');
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+  const context = canvas.getContext('2d');
+  if (!context) {
+    bitmap.close();
+    throw new Error('浏览器无法创建图片画布');
+  }
+
+  context.drawImage(bitmap, 0, 0);
+  bitmap.close();
+
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((pngBlob) => {
+      if (pngBlob) {
+        resolve(pngBlob);
+      } else {
+        reject(new Error('图片转换为 PNG 失败'));
+      }
+    }, 'image/png');
+  });
+}
+
+function clipboardErrorMessage(err: unknown, fallback: string) {
+  if (!(err instanceof Error)) return fallback;
+  if (err.name === 'NotAllowedError') return '剪贴板权限被拒绝，请授权后重试，或使用下载入口';
+  if (err.name === 'NotFoundError') return '剪贴板里没有可读取的图片';
+  return err.message || fallback;
 }
 
 function statusText(file: JobFile) {

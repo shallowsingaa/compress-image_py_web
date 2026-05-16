@@ -144,6 +144,44 @@ button:disabled {
   transform: translateY(-1px);
 }
 
+.clipboard-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  color: var(--muted);
+  background: #fffaf1;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.clipboard-entry button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 8px 12px;
+  color: var(--accent-strong);
+  background: #edf6ef;
+  border: 1px solid #c8ddd0;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.clipboard-entry svg {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+}
+
+.clipboard-entry span {
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .settings,
 .selected {
   display: grid;
@@ -343,6 +381,73 @@ button:focus-visible {
   margin-bottom: 18px;
 }
 
+.clipboard-strip {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+  padding: 10px 12px;
+  color: var(--muted);
+  background: #fffaf1;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.clipboard-strip > svg {
+  width: 18px;
+  height: 18px;
+  color: var(--accent);
+}
+
+.clipboard-strip > span {
+  min-width: 0;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.clipboard-strip button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 8px 12px;
+  color: var(--ink);
+  background: #fffdf8;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.clipboard-strip button svg {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+}
+
+.clipboard-strip--working {
+  background: #f8f5ed;
+}
+
+.clipboard-strip--success {
+  color: var(--accent-strong);
+  background: #edf6ef;
+  border-color: #c8ddd0;
+}
+
+.clipboard-strip--warning {
+  color: #6f541a;
+  background: #fff7df;
+  border-color: #e9d9a3;
+}
+
+.clipboard-strip--error {
+  color: #7a1f15;
+  background: #fcebe7;
+  border-color: #efc7c0;
+}
+
 .queue {
   display: grid;
   gap: 12px;
@@ -540,8 +645,20 @@ button:focus-visible {
     flex-direction: column;
   }
 
+  .clipboard-entry,
+  .clipboard-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .clipboard-entry {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
   .action-row button,
-  .download-row button {
+  .download-row button,
+  .clipboard-entry button,
+  .clipboard-strip button {
     width: 100%;
   }
 
