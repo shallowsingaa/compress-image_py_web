@@ -12,6 +12,10 @@
   "os": [ "win32", "darwin", "linux" ],
   "engines": { "node": ">=16" },
   "scripts": {
-    "postinstall": "node bin/verify-platform.js"
+    "postinstall": "node bin/verify-platform.js",
+    "build:win": "pwsh scripts/build/win.ps1",
+    "build:mac": "bash scripts/build/mac.sh",
+    "build:linux": "bash scripts/build/linux.sh",
+    "build:all": "npm run build:win && npm run build:mac && npm run build:linux"
   }
 }
