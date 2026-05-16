@@ -1,4 +1,4 @@
-# image-compress-cli
+# compress-image-cli
 
 小而强的图片可控压缩工具 CLI 版。
 
@@ -7,7 +7,7 @@
 ## 安装
 
 ```bash
-npm install -g image-compress-cli
+npm install -g compress-image-cli
 ```
 
 ## 使用
