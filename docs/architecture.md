@@ -7,7 +7,6 @@ This project has three entry points over one compression core:
 - Web API: `app.py` exposes FastAPI routes for batch jobs and downloads.
 - Frontend: `web/src/main.tsx` uploads images, polls job status, and opens download routes.
 - CLI: `main.py` calls the same core functions for single-file compression and Windows clipboard batches.
-- npm package: `package/` wraps the CLI as `compress-img-cli`, installing the `compress-img` command that launches a platform-specific PyInstaller binary.
 
 `compress_core.py` owns image processing. Keep new compression behavior in this module first, then expose it through the API, CLI, and frontend as needed.
 
@@ -32,14 +31,6 @@ CLI Windows clipboard flow:
 2. `clipboard_io.py` reads copied image files from `CF_HDROP`, or screenshot bitmap data from `CF_DIB`.
 3. Each clipboard image is compressed through `compress_image_bytes()`.
 4. Outputs are saved under a `clipboard/` subdirectory and copied back to the Windows clipboard as an `CF_HDROP` file list.
-
-npm package flow:
-
-1. Maintainers build binaries with `npm run build:win` on Windows and `npm run build:linux` on Linux.
-2. Build scripts run PyInstaller specs from `scripts/build/` and copy outputs into `package/resources/win/` or `package/resources/linux/`.
-3. `package/bin/compress-image.js` is installed by npm as the `compress-img` command.
-4. At runtime, the Node launcher selects the current platform with `os.platform()` and spawns the bundled binary with the original CLI arguments.
-5. `package/bin/verify-platform.js` runs at postinstall and warns when the current platform binary is missing.
 
 ## Compression Strategy
 
@@ -80,19 +71,6 @@ The frontend defines API response types directly in `web/src/main.tsx`. Backend 
 
 `VITE_API_BASE_URL` is optional. When it is unset, browser requests are same-origin relative URLs such as `/api/jobs`.
 
-## npm Distribution Contract
-
-The published npm package is rooted at `package/`:
-
-- Package name: `compress-img-cli`
-- Installed command: `compress-img`
-- Supported npm `os`: `win32`, `linux`
-- Source launcher: `package/bin/compress-image.js`
-- Windows binary: `package/resources/win/compress-image.exe`
-- Linux binary: `package/resources/linux/compress-image`
-
-`package/resources/` is ignored by git. It must exist before `npm publish`, and `npm pack --dry-run` is the release gate for confirming that both binaries and package docs are included.
-
 ## Known Limits
 
 - Uploaded files and compressed outputs are held fully in memory.
@@ -100,4 +78,3 @@ The published npm package is rooted at `package/`:
 - Background jobs run inside the FastAPI process rather than through a durable queue.
 - There is no file expiry API because there is no persistent file store.
 - CLI clipboard mode is Windows-only and depends on the native clipboard APIs exposed through `ctypes`.
-- npm distribution does not currently ship a macOS binary.

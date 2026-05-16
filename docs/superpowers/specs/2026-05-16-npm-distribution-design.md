@@ -1,7 +1,5 @@
 # Python CLI 工具通过 npm 分发设计方案
 
-> **Status 2026-05-16:** Implemented as `compress-img-cli` / `compress-img`. Current operational details live in `docs/npm-package.md` and `package/PUBLISHING.md`.
-
 ## 1. 目标
 
 将 `compress-image-py-web` 的 Python CLI 工具（`main.py`）通过 npm 全局包分发，用户只需 `npm install -g compress-img-cli` 即可使用 `compress-img` 命令，无需自行安装 Python 环境。
@@ -122,8 +120,7 @@ child.on('exit', (code) => process.exit(code ?? 0));
 1. 在对应平台运行构建命令，生成 `resources/*/` 下的可执行文件
 2. 测试各平台可执行文件正常运行
 3. 提交代码，git tag 打版本
-4. `npm pack --dry-run` 确认两个平台二进制和文档都在 tarball 中
-5. `npm publish` 发布到 npm
+4. `npm publish` 发布到 npm
 
 ### 用户使用
 

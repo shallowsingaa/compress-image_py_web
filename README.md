@@ -7,10 +7,7 @@
 - [命令行版](#命令行版)
 - [网页版](#网页版)
 - [项目结构](#项目结构)
-- [文档索引](#文档索引)
 - [API 参考](#api-参考)
-- [本地开发](#本地开发)
-- [测试](#测试)
 
 ---
 
@@ -309,11 +306,7 @@ rm /tmp/gitee-site-deploy.lock
 ├── clipboard_io.py              # Windows 剪贴板图片读写
 ├── compress_core.py             # CLI 和 API 共用的压缩核心逻辑
 ├── main.py                      # 命令行入口（文件路径和 Windows 剪贴板模式）
-├── package/                     # npm 包 compress-img-cli
-│   ├── bin/                     # Node 启动器和安装后检查
-│   └── resources/               # 发布前生成的平台二进制（git 忽略）
 ├── requirements.txt             # Python 依赖
-├── scripts/build/               # PyInstaller 构建脚本和 spec
 ├── tests/                       # Python 单元测试
 ├── web/                         # React 前端源码
 │   ├── src/main.tsx             # 前端入口，API 调用逻辑
@@ -323,25 +316,8 @@ rm /tmp/gitee-site-deploy.lock
 └── docs/                        # 项目文档
     ├── architecture.md           # 架构说明
     ├── api.md                    # API 参考
-    ├── deployment.md             # 部署和运维
-    └── npm-package.md            # npm 包分发说明
+    └── deployment.md             # 部署和运维
 ```
-
----
-
-## 文档索引
-
-| 文档 | 读者 | 内容 |
-|------|------|------|
-| [CONTEXT.md](CONTEXT.md) | 维护者 / agent | 项目术语、边界和入口 |
-| [AGENTS.md](AGENTS.md) | agent | 代码约定、验证命令和编辑红线 |
-| [docs/architecture.md](docs/architecture.md) | 维护者 | API、前端、CLI、npm 分发的数据流 |
-| [docs/api.md](docs/api.md) | API 使用者 | `/api/jobs`、轮询和下载接口 |
-| [docs/deployment.md](docs/deployment.md) | 运维 | 本地开发、生产部署和 npm 发布入口 |
-| [docs/npm-package.md](docs/npm-package.md) | npm 包维护者 | `compress-img-cli` 架构、构建、发布和故障排查 |
-| [package/README.md](package/README.md) | npm 用户 | 安装、使用、平台支持 |
-| [package/HELP.md](package/HELP.md) | CLI 用户 | `compress-img` 参数和示例 |
-| [package/PUBLISHING.md](package/PUBLISHING.md) | 发布者 | npm 发布 checklist、2FA/token 和回滚 |
 
 ---
 
