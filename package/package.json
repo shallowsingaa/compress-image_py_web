@@ -1,10 +1,10 @@
 {
   "name": "compress-img-cli",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "小而强的图片可控压缩工具 CLI 版，在线体验：ci.clicli.asia",
   "main": "index.js",
   "bin": {
-    "compress-img": "./bin/compress-image.js"
+    "compress-img": "bin/compress-image.js"
   },
   "files": [
     "bin/",
@@ -15,8 +15,13 @@
     "SUPPORT.md",
     "SECURITY.md"
   ],
-  "os": [ "win32", "linux" ],
-  "engines": { "node": ">=16" },
+  "os": [
+    "win32",
+    "linux"
+  ],
+  "engines": {
+    "node": ">=16"
+  },
   "keywords": [
     "image",
     "compress",
