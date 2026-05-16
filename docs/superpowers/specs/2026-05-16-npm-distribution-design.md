@@ -2,7 +2,7 @@
 
 ## 1. 目标
 
-将 `compress-image-py-web` 的 Python CLI 工具（`main.py`）通过 npm 全局包分发，用户只需 `npm install -g image-compress-cli` 即可使用，无需自行安装 Python 环境。
+将 `compress-image-py-web` 的 Python CLI 工具（`main.py`）通过 npm 全局包分发，用户只需 `npm install -g compress-img-cli` 即可使用 `compress-img` 命令，无需自行安装 Python 环境。
 
 ## 2. 整体架构
 
@@ -90,11 +90,11 @@ child.on('exit', (code) => process.exit(code ?? 0));
 
 ```json
 {
-  "name": "image-compress-cli",
+  "name": "compress-img-cli",
   "version": "1.0.0",
   "description": "小而强的图片可控压缩工具 CLI 版，在线体验：ci.clicli.asia",
   "bin": {
-    "compress-image": "./bin/compress-image.js"
+    "compress-img": "./bin/compress-image.js"
   },
   "files": [
     "bin/",
@@ -125,12 +125,12 @@ child.on('exit', (code) => process.exit(code ?? 0));
 ### 用户使用
 
 ```bash
-npm install -g image-compress-cli
+npm install -g compress-img-cli
 
-compress-image input.png
-compress-image -o output.webp input.png
-compress-image --clipboard
-compress-image --target-kb 50 --aggressive input.png
+compress-img input.png
+compress-img -o output.webp input.png
+compress-img --clipboard
+compress-img --target-kb 50 --aggressive input.png
 ```
 
 ## 8. 不纳入的范围
@@ -144,9 +144,9 @@ compress-image --target-kb 50 --aggressive input.png
 
 - [ ] Windows: `npm run build:win` 成功，`package/resources/win/compress-image.exe` 存在
 - [ ] Linux: 在 Linux 平台上运行 `npm run build:linux`，产物存在于 `package/resources/linux/`
-- [ ] Windows: `compress-image --help` 正常输出
-- [ ] Windows: `compress-image <test-image.png>` 确认压缩功能正常
-- [ ] Linux: `compress-image --help` 正常输出，剪贴板功能显示友好提示
+- [ ] Windows: `compress-img --help` 正常输出
+- [ ] Windows: `compress-img <test-image.png>` 确认压缩功能正常
+- [ ] Linux: `compress-img --help` 正常输出，剪贴板功能显示友好提示
 - [ ] 中文输出正常，无乱码
 - [ ] `npm install -g` 安装后 CLI 命令可用
 - [ ] `npm publish --dry-run` 无报错

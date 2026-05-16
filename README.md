@@ -13,7 +13,20 @@
 
 ## 命令行版
 
+### npm 全局安装
+
+如果只需要命令行压缩工具，推荐直接安装 npm 包：
+
+```bash
+npm install -g compress-img-cli
+compress-img --help
+```
+
+该方式会安装预打包好的 Windows / Linux 可执行文件，用户无需手动安装 Python 依赖。npm 包的详细说明见 [`package/README.md`](package/README.md)，发布流程见 [`package/PUBLISHING.md`](package/PUBLISHING.md)。
+
 ### 安装依赖
+
+从源码运行 `main.py` 时再安装 Python 依赖：
 
 ```bash
 python -m pip install -r requirements.txt

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 将 Python CLI 工具通过 npm 全局包分发，用户只需 `npm install -g image-compress-cli` 即可使用。
+**Goal:** 将 Python CLI 工具通过 npm 全局包分发，用户只需 `npm install -g compress-img-cli` 即可使用 `compress-img` 命令。
 
 **Architecture:** Node.js 启动器检测平台并调用 PyInstaller 捆绑的 Python 可执行文件，实现真正的零配置跨平台分发。仅支持 Windows 和 Linux。
 
@@ -54,11 +54,11 @@ Run: `mkdir -p package/bin package/resources`
 
 ```json
 {
-  "name": "image-compress-cli",
+  "name": "compress-img-cli",
   "version": "1.0.0",
   "description": "小而强的图片可控压缩工具 CLI 版，在线体验：ci.clicli.asia",
   "bin": {
-    "compress-image": "./bin/compress-image.js"
+    "compress-img": "./bin/compress-image.js"
   },
   "files": [
     "bin/",
@@ -152,7 +152,7 @@ Run: Write to `package/bin/verify-platform.js`
 - [ ] **Step 6: 创建 package/README.md**
 
 ```markdown
-# image-compress-cli
+# compress-img-cli
 
 小而强的图片可控压缩工具 CLI 版。
 
@@ -161,16 +161,16 @@ Run: Write to `package/bin/verify-platform.js`
 ## 安装
 
 ```bash
-npm install -g image-compress-cli
+npm install -g compress-img-cli
 ```
 
 ## 使用
 
 ```bash
-compress-image input.png
-compress-image -o output.webp input.png
-compress-image --clipboard
-compress-image --target-kb 50 --aggressive input.png
+compress-img input.png
+compress-img -o output.webp input.png
+compress-img --clipboard
+compress-img --target-kb 50 --aggressive input.png
 ```
 
 ## 平台支持
@@ -399,11 +399,11 @@ git commit -m "feat(build): add PyInstaller build scripts for Win/Linux"
 
 ```json
 {
-  "name": "image-compress-cli",
+  "name": "compress-img-cli",
   "version": "1.0.0",
   "description": "小而强的图片可控压缩工具 CLI 版，在线体验：ci.clicli.asia",
   "bin": {
-    "compress-image": "./bin/compress-image.js"
+    "compress-img": "./bin/compress-image.js"
   },
   "files": [
     "bin/",
@@ -486,16 +486,16 @@ git commit -m "chore: add npm build artifacts to gitignore"
 ### 功能验证
 
 **Windows 功能验证：**
-- [ ] 运行 `compress-image --help`，确认输出正常
+- [ ] 运行 `compress-img --help`，确认输出正常
 - [ ] 确认中文帮助信息无乱码
-- [ ] 运行 `compress-image assets/000.jpg`，确认压缩功能正常
-- [ ] 运行 `compress-image --clipboard`，确认剪贴板功能正常
+- [ ] 运行 `compress-img assets/000.jpg`，确认压缩功能正常
+- [ ] 运行 `compress-img --clipboard`，确认剪贴板功能正常
 
 **Linux 功能验证：**
-- [ ] 运行 `compress-image --help`，确认输出正常
+- [ ] 运行 `compress-img --help`，确认输出正常
 - [ ] 确认中文帮助信息无乱码
-- [ ] 运行 `compress-image assets/000.jpg`，确认压缩功能正常
-- [ ] 运行 `compress-image --clipboard`，确认输出友好提示："剪贴板功能在 Linux 上暂不可用"
+- [ ] 运行 `compress-img assets/000.jpg`，确认压缩功能正常
+- [ ] 运行 `compress-img --clipboard`，确认输出友好提示："剪贴板功能在 Linux 上暂不可用"
 
 ### npm 发布验证
 

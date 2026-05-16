@@ -2,15 +2,40 @@
   "name": "compress-img-cli",
   "version": "1.0.0",
   "description": "小而强的图片可控压缩工具 CLI 版，在线体验：ci.clicli.asia",
+  "main": "index.js",
   "bin": {
     "compress-img": "./bin/compress-image.js"
   },
   "files": [
     "bin/",
-    "resources/"
+    "resources/",
+    "HELP.md",
+    "PUBLISHING.md",
+    "CHANGELOG.md"
   ],
   "os": [ "win32", "linux" ],
   "engines": { "node": ">=16" },
+  "keywords": [
+    "image",
+    "compress",
+    "cli",
+    "pillow",
+    "webp",
+    "jpeg",
+    "png",
+    "中文"
+  ],
+  "homepage": "https://ci.clicli.asia",
+  "repository": {
+    "type": "git",
+    "url": "git+https://gitee.com/shallowspider/compress-image_py_web.git",
+    "directory": "package"
+  },
+  "bugs": {
+    "url": "https://gitee.com/shallowspider/compress-image_py_web/issues"
+  },
+  "author": "shallowsingmz",
+  "license": "MIT",
   "scripts": {
     "postinstall": "node bin/verify-platform.js",
     "build:win": "powershell -ExecutionPolicy Bypass -File ../scripts/build/win.ps1",
