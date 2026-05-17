@@ -11,6 +11,7 @@ This repository is a runnable image compression web app. Keep changes aligned wi
 - `web/` is a Vite + React + TypeScript frontend.
 - `package/` is the npm package root for `compress-img-cli`; it ships Node launchers plus generated PyInstaller binaries under `package/resources/`.
 - `Linux/auto_sync_build_run.sh` is the deployment script for the Gitee-hosted production flow.
+- `scripts/install-compress-img-hotkey/` contains the Windows Alt+E helper installer; it registers the elevated task through Task Scheduler COM, writes `%LOCALAPPDATA%\CompressImgHotkey\install.log`, and keeps the user-facing usage notes in its local `README.md`.
 - `docs/` is the human-facing handoff documentation. Update it when API routes, compression options, deployment ports, or runtime assumptions change.
 
 ## Runtime Contracts
@@ -63,6 +64,7 @@ For npm package binary changes, also run `npm run build:win` on Windows and `npm
 
 - Preserve Chinese UI and error messages unless the user asks to rewrite copy.
 - Keep Windows clipboard behavior isolated in `clipboard_io.py`; non-Windows callers should receive a clear `ClipboardError`.
+- When changing `scripts/install-compress-img-hotkey/`, keep the script and its local `README.md` aligned on UAC behavior, install artifacts, and log-file location.
 - Prefer updating `CompressOptions` and tests together when adding compression parameters.
 - Keep API response field names stable; the React types in `web/src/main.tsx` depend on them.
 - Do not document the frontend as defaulting to `127.0.0.1:8793`; that only happens when `VITE_API_BASE_URL` is set.

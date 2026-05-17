@@ -14,6 +14,29 @@ powershell -ExecutionPolicy Bypass -File .\install-compress-img-hotkey.ps1
 
 安装时会弹一次 UAC。之后按 `Alt+E` 不会每次都弹。
 
+安装脚本会在当前用户目录写入日志：
+
+```text
+C:\Users\<你的用户名>\AppData\Local\CompressImgHotkey\install.log
+```
+
+如果 UAC 授权后安装窗口很快关闭，先看这份日志。它会记录计划任务注册、热键程序编译、启动项写入和最终启动步骤。
+
+## 安装结果
+
+安装完成后会创建以下内容：
+
+- 计划任务 `CompressImgClipboard65`
+- 热键程序 `%LOCALAPPDATA%\CompressImgHotkey\CompressImgHotkey.exe`
+- 提权命令 `%ProgramData%\CompressImgHotkey\run-compress-img.cmd`
+- 启动项 `CompressImgHotkey.lnk`
+
+热键程序常驻后，按 `Alt+E` 会触发计划任务，以最高权限执行：
+
+```text
+compress-img --clipboard --target-kb 65
+```
+
 ---
 
 ## 卸载
