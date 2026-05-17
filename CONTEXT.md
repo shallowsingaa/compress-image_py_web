@@ -11,6 +11,7 @@
 - **Vite 前端**：`web/`，提供中文批量上传、拖拽、桌面粘贴、轮询结果、逐个下载和 ZIP 下载。
 - **npm 包**：`package/`，发布名 `compress-img-cli`，安装后命令名 `compress-img`。
 - **平台二进制**：PyInstaller 生成的 `package/resources/win/compress-image.exe` 和 `package/resources/linux/compress-image`；属于发布产物，不提交到 git。
+- **Windows Alt+E 热键助手**：`scripts/install-compress-img-hotkey/`，安装常驻热键程序 `CompressImgHotkey.exe`，通过计划任务 `CompressImgClipboard` 以最高权限运行脚本顶部 `$TaskCommand` 指定的 `compress-img` 命令。
 - **部署脚本**：`Linux/auto_sync_build_run.sh`，用于 Gitee + 1Panel/OpenResty 风格的服务器自动同步、构建和启动。
 
 ## 设计边界
@@ -20,6 +21,7 @@
 - 前端默认请求同源 `/api`；只有设置 `VITE_API_BASE_URL` 时才请求指定后端源。
 - npm 发布前必须先生成二进制并运行 `npm pack --dry-run`。
 - Linux 和 Web 的剪贴板能力不同，不要把 Windows CLI 剪贴板模式误写成跨平台能力。
+- Windows Alt+E 热键助手的当前计划任务名是 `CompressImgClipboard`；重新安装应更新它而不是清理它，只清理旧任务名。
 
 ## 面向读者的入口
 
@@ -30,3 +32,4 @@
 - npm 包分发：`docs/npm-package.md`
 - npm 用户文档：`package/README.md`
 - npm 发布文档：`package/PUBLISHING.md`
+- Windows Alt+E 热键安装：`scripts/install-compress-img-hotkey/README.md`

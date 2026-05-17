@@ -1,14 +1,17 @@
 #requires -version 5.1
 
 param(
-  [string]$LogFile
+  [string]$LogFile,
+  [switch]$SkipStartHotkey
 )
 
 $ErrorActionPreference = "Stop"
 
 $UserDir = Join-Path $env:LOCALAPPDATA "CompressImgHotkey"
 $TaskDir = Join-Path $env:ProgramData "CompressImgHotkey"
-$TaskName = "CompressImgClipboard65"
+$TaskName = "CompressImgClipboard"
+$LegacyTaskNames = @("CompressImgClipboard65")
+$TaskCommand = "compress-img --clipboard --target-kb 40"
 $CmdFile = Join-Path $TaskDir "run-compress-img.cmd"
 $ExeFile = Join-Path $UserDir "CompressImgHotkey.exe"
 $InstallLogFile = if ($LogFile) { $LogFile } else { Join-Path $UserDir "install.log" }
@@ -123,6 +126,9 @@ function Register-HotkeyScheduledTask {
     [string]$UserSid,
 
     [Parameter(Mandatory = $true)]
+    [string]$TaskCommand,
+
+    [Parameter(Mandatory = $true)]
     [string]$CommandPath
   )
 
@@ -132,7 +138,7 @@ function Register-HotkeyScheduledTask {
   $RootFolder = $TaskService.GetFolder("\")
   $TaskDefinition = $TaskService.NewTask(0)
 
-  $TaskDefinition.RegistrationInfo.Description = "Run compress-img clipboard compression at 65 KB with elevated privileges."
+  $TaskDefinition.RegistrationInfo.Description = ("Run with elevated privileges: {0}" -f $TaskCommand)
   $TaskDefinition.Principal.UserId = $UserId
   $TaskDefinition.Principal.LogonType = 3 # TASK_LOGON_INTERACTIVE_TOKEN
   $TaskDefinition.Principal.RunLevel = 1 # TASK_RUNLEVEL_HIGHEST
@@ -166,6 +172,34 @@ function Register-HotkeyScheduledTask {
   }
 }
 
+function Remove-LegacyHotkeyScheduledTasks {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string[]]$TaskNames,
+
+    [Parameter(Mandatory = $true)]
+    [string]$CurrentTaskName
+  )
+
+  $TaskService = New-Object -ComObject "Schedule.Service"
+  $TaskService.Connect()
+  $RootFolder = $TaskService.GetFolder("\")
+
+  foreach ($LegacyTaskName in $TaskNames) {
+    if ([string]::Equals($LegacyTaskName, $CurrentTaskName, [System.StringComparison]::OrdinalIgnoreCase)) {
+      continue
+    }
+
+    try {
+      $RootFolder.DeleteTask($LegacyTaskName, 0)
+      Write-InstallLog ("已清理旧计划任务：{0}" -f $LegacyTaskName)
+    }
+    catch {
+      Write-InstallLog ("旧计划任务无需清理或无法清理：{0}；{1}" -f $LegacyTaskName, $_.Exception.Message)
+    }
+  }
+}
+
 if (-not (Test-IsRunningAsAdministrator)) {
   $ScriptPath = $PSCommandPath
   if (-not $ScriptPath) {
@@ -183,7 +217,8 @@ if (-not (Test-IsRunningAsAdministrator)) {
     "-File",
     ('"{0}"' -f $ScriptPath),
     "-LogFile",
-    ('"{0}"' -f $InstallLogFile)
+    ('"{0}"' -f $InstallLogFile),
+    "-SkipStartHotkey"
   )
 
   try {
@@ -193,14 +228,28 @@ if (-not (Test-IsRunningAsAdministrator)) {
       -FilePath "powershell.exe" `
       -ArgumentList $ElevatedArguments `
       -Verb RunAs `
+      -WindowStyle Hidden `
       -Wait `
       -PassThru
+
     Write-InstallLog ("提权安装进程已结束，退出码：{0}" -f $ElevatedProcess.ExitCode)
     Write-Host "提权安装进程已结束，退出码：$($ElevatedProcess.ExitCode)"
+
+    if ($ElevatedProcess.ExitCode -eq 0) {
+      if (-not (Test-Path -LiteralPath $ExeFile)) {
+        throw "热键程序安装后不存在：$ExeFile"
+      }
+
+      Write-InstallLog "准备以当前用户身份启动热键程序。"
+      Start-Process $ExeFile
+      Write-InstallLog "热键程序已由当前用户启动。"
+      Write-Host "热键程序已启动。"
+    }
+
     exit $ElevatedProcess.ExitCode
   }
   catch {
-    throw '无法请求管理员权限。请右键 PowerShell 选择“以管理员身份运行”，然后重新执行此安装脚本。'
+    throw '无法完成提权安装流程。请查看安装日志；也可以右键 PowerShell 选择“以管理员身份运行”，然后重新执行此安装脚本。'
   }
 }
 
@@ -212,17 +261,15 @@ Write-InstallLog ("准备保护任务命令目录：{0}" -f $TaskDir)
 Protect-AdminOnlyDirectory -Path $TaskDir
 
 Write-InstallLog ("准备写入提权命令：{0}" -f $CmdFile)
-@"
-@echo off
-compress-img --clipboard --target-kb 65
-"@ | Set-Content -Encoding ASCII -Path $CmdFile
+$TaskCommand | Set-Content -Encoding ASCII -Path $CmdFile
 
 # 创建/更新一个“最高权限运行”的计划任务
 $CurrentUserId = Get-CurrentWindowsUserId
 $CurrentUserSid = Get-CurrentWindowsUserSid
 Write-InstallLog ("准备注册计划任务：{0}，用户：{1}，SID：{2}" -f $TaskName, $CurrentUserId, $CurrentUserSid)
-Register-HotkeyScheduledTask -UserId $CurrentUserId -UserSid $CurrentUserSid -CommandPath $CmdFile
+Register-HotkeyScheduledTask -UserId $CurrentUserId -UserSid $CurrentUserSid -TaskCommand $TaskCommand -CommandPath $CmdFile
 Write-InstallLog "计划任务注册完成。"
+Remove-LegacyHotkeyScheduledTasks -TaskNames $LegacyTaskNames -CurrentTaskName $TaskName
 
 # 编译一个小的 Windows 热键程序：Alt+E 触发 schtasks /run
 $cs = @"
@@ -283,7 +330,7 @@ public class Program
             var psi = new ProcessStartInfo
             {
                 FileName = "schtasks.exe",
-                Arguments = "/run /tn \"CompressImgClipboard65\"",
+                Arguments = "/run /tn \"CompressImgClipboard\"",
                 CreateNoWindow = true,
                 UseShellExecute = false,
                 WindowStyle = ProcessWindowStyle.Hidden
@@ -343,11 +390,18 @@ $Shortcut.WorkingDirectory = $UserDir
 $Shortcut.Description = "Alt+E runs compress-img clipboard compression"
 $Shortcut.Save()
 
-Write-InstallLog "准备启动热键程序。"
-Start-Process $ExeFile
+if ($SkipStartHotkey) {
+  Write-InstallLog "已跳过提权进程内启动热键程序；将由原终端启动。"
+}
+else {
+  Write-InstallLog "准备启动热键程序。"
+  Start-Process $ExeFile
+  Write-InstallLog "热键程序已启动。"
+}
+
 Write-InstallLog "安装完成。"
 
-Write-Host "安装完成。以后按 Alt+E 会运行：compress-img --clipboard --target-kb 65"
+Write-Host "安装完成。以后按 Alt+E 会运行：$TaskCommand"
 Write-Host "热键程序路径：$ExeFile"
 Write-Host "提权命令路径：$CmdFile"
 Write-Host "计划任务名称：$TaskName"

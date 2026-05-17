@@ -52,7 +52,7 @@ Assert-Contains `
 
 Assert-Contains `
   -Text $Installer `
-  -Pattern '无法请求管理员权限' `
+  -Pattern '无法完成提权安装流程' `
   -Message "Installer must give a clear Chinese error when UAC elevation cannot be started."
 
 if ($Installer -match 'New-ScheduledTaskPrincipal[^\r\n]+-UserId\s+\$env:USERNAME') {
@@ -88,6 +88,45 @@ Assert-Contains `
   -Text $Installer `
   -Pattern 'Get-ScheduledTask\s+-TaskName\s+\$TaskName' `
   -Message "Installer must verify that the scheduled task exists after registration."
+
+Assert-Contains `
+  -Text $Installer `
+  -Pattern '\$TaskName\s*=\s*"CompressImgClipboard"' `
+  -Message "The current scheduled task name should not encode the target size."
+
+Assert-Contains `
+  -Text $Installer `
+  -Pattern '\$TaskCommand\s*=\s*"compress-img --clipboard --target-kb 40"' `
+  -Message "The elevated command must be easy to change near the top of the installer."
+
+Assert-Contains `
+  -Text $Installer `
+  -Pattern '\$TaskCommand\s+\|\s+Set-Content\s+-Encoding\s+ASCII\s+-Path\s+\$CmdFile' `
+  -Message "The elevated command file must use the configured task command."
+
+Assert-Contains `
+  -Text $Installer `
+  -Pattern 'Arguments\s*=\s*"/run /tn \\"CompressImgClipboard\\""' `
+  -Message "The hotkey exe must run the current scheduled task."
+
+if ($Installer -match 'compress-img --clipboard --target-kb 65') {
+  throw "Installer must not keep the old 65 KB clipboard command."
+}
+
+$ElevatedLaunchMatch = [regex]::Match($Installer, '(?s)Start-Process\s+`\s*\r?\n\s+-FilePath\s+"powershell\.exe".*?-Verb\s+RunAs.*?-Wait\s+`\s*\r?\n\s*-PassThru')
+if (-not $ElevatedLaunchMatch.Success) {
+  throw "Unelevated installer must wait for the elevated installer so it can return a useful result."
+}
+
+Assert-Contains `
+  -Text $Installer `
+  -Pattern '"-SkipStartHotkey"' `
+  -Message "Elevated installer must skip starting the resident hotkey process while the parent is waiting."
+
+Assert-Contains `
+  -Text $Installer `
+  -Pattern 'if\s*\(\$SkipStartHotkey\)' `
+  -Message "Installer must conditionally skip hotkey startup in the elevated child process."
 
 if ($Installer -match 'Register-ScheduledTask') {
   throw "Installer must not use Register-ScheduledTask in this environment."

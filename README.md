@@ -11,6 +11,7 @@
 - [API 参考](#api-参考)
 - [本地开发](#本地开发)
 - [测试](#测试)
+- [Windows Alt+E 热键](#windows-alte-热键)
 
 ---
 
@@ -105,6 +106,16 @@ python main.py 输入.png --format webp -o outputs/result.webp
 # 5. 提高目标体积上限
 python main.py 输入.png --target-kb 120
 ```
+
+### Windows Alt+E 热键
+
+Windows 上可使用 `scripts/install-compress-img-hotkey/` 安装 Alt+E 热键助手。安装后按 `Alt+E` 会通过计划任务 `CompressImgClipboard` 以最高权限运行脚本顶部 `$TaskCommand` 指定的命令，默认是：
+
+```text
+compress-img --clipboard --target-kb 40
+```
+
+安装、卸载、日志和修改命令的方法见 [`scripts/install-compress-img-hotkey/README.md`](scripts/install-compress-img-hotkey/README.md)。
 
 ---
 
@@ -314,6 +325,8 @@ rm /tmp/gitee-site-deploy.lock
 │   └── resources/               # 发布前生成的平台二进制（git 忽略）
 ├── requirements.txt             # Python 依赖
 ├── scripts/build/               # PyInstaller 构建脚本和 spec
+├── scripts/install-compress-img-hotkey/
+│   └── install-compress-img-hotkey.ps1  # Windows Alt+E 热键安装器
 ├── tests/                       # Python 单元测试
 ├── web/                         # React 前端源码
 │   ├── src/main.tsx             # 前端入口，API 调用逻辑
@@ -342,6 +355,7 @@ rm /tmp/gitee-site-deploy.lock
 | [package/README.md](package/README.md) | npm 用户 | 安装、使用、平台支持 |
 | [package/HELP.md](package/HELP.md) | CLI 用户 | `compress-img` 参数和示例 |
 | [package/PUBLISHING.md](package/PUBLISHING.md) | 发布者 | npm 发布 checklist、2FA/token 和回滚 |
+| [scripts/install-compress-img-hotkey/README.md](scripts/install-compress-img-hotkey/README.md) | Windows 用户 / 维护者 | Alt+E 热键安装、卸载、日志和计划任务说明 |
 
 ---
 
