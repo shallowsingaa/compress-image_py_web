@@ -112,7 +112,7 @@ python main.py 输入.png --target-kb 120
 Windows 上可使用 `scripts/install-compress-img-hotkey/` 安装 Alt+E 热键助手。安装后按 `Alt+E` 会通过计划任务 `CompressImgClipboard` 以最高权限运行脚本顶部 `$TaskCommand` 指定的命令，默认是：
 
 ```text
-compress-img --clipboard --target-kb 40
+compress-img --clipboard --target-kb 50
 ```
 
 安装、卸载、日志和修改命令的方法见 [`scripts/install-compress-img-hotkey/README.md`](scripts/install-compress-img-hotkey/README.md)。

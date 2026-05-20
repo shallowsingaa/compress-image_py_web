@@ -19,6 +19,8 @@
 - npm 包用户文档：[../../package/README.md](../../package/README.md)
 - npm 包发布文档：[../../package/PUBLISHING.md](../../package/PUBLISHING.md)
 - 命令帮助文档：[../../package/HELP.md](../../package/HELP.md)
+- 架构决策记录：[../adr/](../adr/)
+- Agent 工作约定：[../agents/](../agents/)
 
 ## 维护规则
 

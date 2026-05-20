@@ -1,6 +1,6 @@
 # install-compress-img-hotkey
 
-当按 Alt+E 时，自动以管理员身份（不能每次都需要我批准）执行 `compress-img --clipboard --target-kb 40` 这条命令
+当按 Alt+E 时，自动以管理员身份（不能每次都需要我批准）执行 `compress-img --clipboard --target-kb 50` 这条命令
 
 ---
 
@@ -36,7 +36,7 @@ C:\Users\<你的用户名>\AppData\Local\CompressImgHotkey\install.log
 热键程序常驻后，按 `Alt+E` 会触发计划任务，以最高权限执行：
 
 ```text
-compress-img --clipboard --target-kb 40
+compress-img --clipboard --target-kb 50
 ```
 
 如需修改热键执行的命令，改安装脚本开头的 `$TaskCommand`，然后重新运行安装脚本。
