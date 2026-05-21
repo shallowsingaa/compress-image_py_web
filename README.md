@@ -317,8 +317,10 @@ rm /tmp/gitee-site-deploy.lock
 ```
 .
 ├── app.py                       # FastAPI 后端（内存任务队列）
+├── batch_compress.py            # 多图逐文件压缩结果归一
 ├── clipboard_io.py              # Windows 剪贴板图片读写
 ├── compress_core.py             # CLI 和 API 共用的压缩核心逻辑
+├── job_store.py                 # FastAPI 内存任务状态和响应序列化
 ├── main.py                      # 命令行入口（文件路径和 Windows 剪贴板模式）
 ├── package/                     # npm 包 compress-img-cli
 │   ├── bin/                     # Node 启动器和安装后检查
@@ -329,7 +331,12 @@ rm /tmp/gitee-site-deploy.lock
 │   └── install-compress-img-hotkey.ps1  # Windows Alt+E 热键安装器
 ├── tests/                       # Python 单元测试
 ├── web/                         # React 前端源码
-│   ├── src/main.tsx             # 前端入口，API 调用逻辑
+│   ├── src/main.tsx             # 前端入口和页面组合
+│   ├── src/api.ts               # API 请求和下载 URL
+│   ├── src/clipboard.ts         # 浏览器剪贴板读写辅助
+│   ├── src/device.ts            # 设备识别
+│   ├── src/format.ts            # 状态和体积格式化
+│   ├── src/types.ts             # 前端 API 响应和选项类型
 │   └── dist/                    # 前端构建产物（npm run build 生成）
 ├── Linux/
 │   └── auto_sync_build_run.sh   # Linux 服务器自动同步部署脚本

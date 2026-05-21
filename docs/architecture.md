@@ -5,7 +5,7 @@
 This project has three entry points over one compression core:
 
 - Web API: `app.py` exposes FastAPI routes for batch jobs and downloads.
-- Frontend: `web/src/main.tsx` uploads images, polls job status, and opens download routes.
+- Frontend: `web/src/main.tsx` composes the UI; `web/src/api.ts`, `web/src/clipboard.ts`, `web/src/device.ts`, `web/src/format.ts`, and `web/src/types.ts` hold request, browser workflow, formatting, and response-type helpers.
 - CLI: `main.py` calls the same core functions for single-file compression and Windows clipboard batches.
 - npm package: `package/` wraps the CLI as `compress-img-cli`, installing the `compress-img` command that launches a platform-specific PyInstaller binary.
 
@@ -68,7 +68,7 @@ This means old jobs disappear when the process restarts. Multiple Uvicorn worker
 
 ## Frontend Contract
 
-The frontend defines API response types directly in `web/src/main.tsx`. Backend response fields should remain stable:
+The frontend defines API response types in `web/src/types.ts`. Backend response fields should remain stable:
 
 - `id`
 - `status`

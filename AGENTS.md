@@ -5,9 +5,10 @@ This repository is a runnable image compression web app. Keep changes aligned wi
 ## Project Shape
 
 - `compress_core.py` is the shared compression implementation for both the CLI and API.
+- `batch_compress.py` owns per-file batch success/failure semantics over the shared core.
 - `main.py` is the CLI entry point and should stay behaviorally consistent with the shared core.
 - `clipboard_io.py` contains Windows-only clipboard image/file-list interop for the CLI `--clipboard` mode.
-- `app.py` exposes the FastAPI API and stores jobs in process memory.
+- `app.py` exposes the FastAPI API routes; `job_store.py` stores jobs and compressed bytes in process memory.
 - `web/` is a Vite + React + TypeScript frontend.
 - `package/` is the npm package root for `compress-img-cli`; it ships Node launchers plus generated PyInstaller binaries under `package/resources/`.
 - `Linux/auto_sync_build_run.sh` is the deployment script for the Gitee-hosted production flow.
@@ -68,7 +69,7 @@ For npm package binary changes, also run `npm run build:win` on Windows and `npm
 - The hotkey installer should update the current `CompressImgClipboard` task in place and only clean legacy names such as `CompressImgClipboard65`; do not treat the current task as stale just because the installer has already run once.
 - The unelevated hotkey installer may wait for the elevated installer to preserve its exit code, but the elevated child must use `-SkipStartHotkey` so it does not start the resident hotkey process while the parent is waiting.
 - Prefer updating `CompressOptions` and tests together when adding compression parameters.
-- Keep API response field names stable; the React types in `web/src/main.tsx` depend on them.
+- Keep API response field names stable; the React types in `web/src/types.ts` depend on them.
 - Do not document the frontend as defaulting to `127.0.0.1:8793`; that only happens when `VITE_API_BASE_URL` is set.
 - Do not commit `package/resources/`; those binaries are release artifacts, not source.
 - Keep `package/README.md`, `package/HELP.md`, `package/PUBLISHING.md`, `docs/npm-package.md`, and `docs/superpowers/` aligned when changing npm package name, command name, supported platforms, or publish flow.

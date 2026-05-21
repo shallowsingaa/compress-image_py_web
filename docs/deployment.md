@@ -129,7 +129,7 @@ cmd /c npm run build
 
 ## Operational Notes
 
-- Keep Uvicorn to one worker unless `_jobs` is replaced with shared storage.
+- Keep Uvicorn to one worker unless `job_store.py` is replaced with shared storage.
 - Restarting the backend clears all active jobs and download data.
 - Large batches can increase memory use because original uploads and compressed outputs are processed in-process.
 - CORS currently allows all origins. Tighten it before exposing the API to untrusted networks.
