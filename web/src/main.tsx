@@ -16,64 +16,18 @@ import {
   X,
   XCircle,
 } from 'lucide-react';
+import { createCompressionJob, downloadFileUrl, downloadZipUrl, fetchJob } from './api';
+import {
+  buildCompressedClipboardItems,
+  clipboardErrorMessage,
+  extractImageFilesFromClipboardData,
+  extractImageFilesFromClipboardItems,
+  isEditableTarget,
+} from './clipboard';
+import { detectDevice } from './device';
+import { formatBytes, statusText } from './format';
+import type { ApkPackage, ClipboardStatus, DeviceCategory, Job, JobFile, Options, OutputFormat } from './types';
 import './styles.css';
-
-type OutputFormat = 'jpg' | 'png' | 'webp' | 'auto';
-type JobStatus = 'queued' | 'processing' | 'done';
-type FileStatus = 'queued' | 'processing' | 'done' | 'error';
-
-type JobFile = {
-  id: string;
-  filename: string;
-  status: FileStatus;
-  original_size: number;
-  original_width: number | null;
-  original_height: number | null;
-  output_filename: string | null;
-  output_size: number | null;
-  output_width: number | null;
-  output_height: number | null;
-  output_format: string | null;
-  note: string | null;
-  success: boolean | null;
-  error: string | null;
-  compression_ratio: number | null;
-};
-
-type Job = {
-  id: string;
-  status: JobStatus;
-  total: number;
-  completed: number;
-  failed: number;
-  files: JobFile[];
-};
-
-type Options = {
-  targetKb: number;
-  maxSide: number;
-  outputFormat: OutputFormat;
-  minQuality: number;
-  grayscale: boolean;
-  aggressive: boolean;
-};
-
-type ClipboardTone = 'idle' | 'working' | 'success' | 'warning' | 'error';
-
-type ClipboardStatus = {
-  tone: ClipboardTone;
-  message: string;
-};
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '';
-
-type DeviceCategory = 'android' | 'harmonyos' | 'ios' | 'desktop';
-
-type ApkPackage = {
-  arch: string;
-  url: string;
-  description: string;
-};
 
 const APK_PACKAGES: ApkPackage[] = [
   {
@@ -92,30 +46,6 @@ const APK_PACKAGES: ApkPackage[] = [
     description: '适合安卓模拟器或 x86 平板',
   },
 ];
-
-function detectDevice(): DeviceCategory {
-  if (typeof navigator === 'undefined') return 'desktop';
-  const ua = navigator.userAgent || '';
-
-  if (
-    /iPhone|iPad|iPod/i.test(ua) ||
-    (navigator.platform === 'MacIntel' &&
-      typeof (navigator as Navigator & { maxTouchPoints?: number }).maxTouchPoints === 'number' &&
-      (navigator as Navigator & { maxTouchPoints: number }).maxTouchPoints > 1)
-  ) {
-    return 'ios';
-  }
-
-  if (/OpenHarmony|ArkWeb/i.test(ua) || (/HarmonyOS/i.test(ua) && !/Android/i.test(ua))) {
-    return 'harmonyos';
-  }
-
-  if (/Android/i.test(ua)) {
-    return 'android';
-  }
-
-  return 'desktop';
-}
 
 function App() {
   const [files, setFiles] = useState<File[]>([]);
@@ -162,7 +92,7 @@ function App() {
 
     const timer = window.setInterval(async () => {
       try {
-        const next = await fetchJson<Job>(`${API_BASE}/api/jobs/${job.id}`);
+        const next = await fetchJob(job.id);
         setJob(next);
       } catch (err) {
         setError(err instanceof Error ? err.message : '查询任务状态失败');
@@ -221,20 +151,8 @@ function App() {
     setIsSubmitting(true);
     setError('');
     setJob(null);
-    const form = new FormData();
-    nextFiles.forEach((file) => form.append('files', file));
-    form.append('target_kb', String(options.targetKb));
-    form.append('max_side', String(options.maxSide));
-    form.append('output_format', options.outputFormat);
-    form.append('min_quality', String(options.minQuality));
-    form.append('grayscale', String(options.grayscale));
-    form.append('aggressive', String(options.aggressive));
-
     try {
-      const created = await fetchJson<Job>(`${API_BASE}/api/jobs`, {
-        method: 'POST',
-        body: form,
-      });
+      const created = await createCompressionJob(nextFiles, options);
       setJob(created);
       return created;
     } catch (err) {
@@ -391,7 +309,7 @@ function App() {
 
   function downloadOne(fileId: string) {
     if (!job) return;
-    window.open(`${API_BASE}/api/jobs/${job.id}/files/${fileId}/download`, '_blank');
+    window.open(downloadFileUrl(job.id, fileId), '_blank');
   }
 
   function downloadAllIndividually() {
@@ -402,7 +320,7 @@ function App() {
 
   function downloadZip() {
     if (!job) return;
-    window.open(`${API_BASE}/api/jobs/${job.id}/download.zip`, '_blank');
+    window.open(downloadZipUrl(job.id), '_blank');
   }
 
   return (
@@ -803,164 +721,6 @@ function DownloadPanelBody({ device }: { device: DeviceCategory }) {
       <p className="app-download__foot">不确定?多数 2019 年以后的安卓手机选 arm64-v8a 就好。</p>
     </>
   );
-}
-
-function isEditableTarget(target: EventTarget | null) {
-  if (!(target instanceof HTMLElement)) return false;
-  const editable = target.closest('input, textarea, select, [contenteditable="true"]');
-  return Boolean(editable);
-}
-
-function extractImageFilesFromClipboardData(data: DataTransfer | null) {
-  if (!data) return [];
-
-  const files = Array.from(data.files)
-    .filter((file) => file.type.startsWith('image/'))
-    .map((file, index) => normalizeClipboardFile(file, index));
-
-  if (files.length) return files;
-
-  return Array.from(data.items)
-    .filter((item) => item.kind === 'file' && item.type.startsWith('image/'))
-    .map((item, index) => {
-      const file = item.getAsFile();
-      return file ? normalizeClipboardFile(file, index, item.type) : null;
-    })
-    .filter((file): file is File => file !== null);
-}
-
-async function extractImageFilesFromClipboardItems(items: ClipboardItem[]) {
-  const images: File[] = [];
-
-  for (const item of items) {
-    const imageType = item.types.find((type) => type.startsWith('image/'));
-    if (!imageType) continue;
-
-    const blob = await item.getType(imageType);
-    images.push(
-      new File([blob], clipboardFileName(imageType, images.length), {
-        type: imageType,
-        lastModified: Date.now(),
-      }),
-    );
-  }
-
-  return images;
-}
-
-function normalizeClipboardFile(file: File, index: number, fallbackType?: string) {
-  const type = file.type || fallbackType || 'image/png';
-  if (file.name) {
-    return new File([file], file.name, { type, lastModified: file.lastModified || Date.now() });
-  }
-  return new File([file], clipboardFileName(type, index), { type, lastModified: Date.now() });
-}
-
-function clipboardFileName(type: string, index: number) {
-  const extension = typeToExtension(type);
-  const stamp = new Date().toISOString().replace(/[-:T.Z]/g, '').slice(0, 14);
-  return `clipboard-${stamp}-${index + 1}.${extension}`;
-}
-
-function typeToExtension(type: string) {
-  if (type === 'image/jpeg') return 'jpg';
-  if (type === 'image/webp') return 'webp';
-  if (type === 'image/gif') return 'gif';
-  return 'png';
-}
-
-async function buildCompressedClipboardItems(jobId: string, files: JobFile[]) {
-  const items: ClipboardItem[] = [];
-
-  for (const file of files) {
-    const { blob, mime } = await fetchCompressedBlob(jobId, file);
-    if (!clipboardSupportsMime(mime)) {
-      throw new Error(
-        `浏览器剪贴板不支持写入 ${mimeToFormatLabel(mime)}，不能在保持输出格式的前提下复制；请使用下载入口，或把输出格式改为 PNG 后重试`,
-      );
-    }
-
-    const clipboardBlob = new Blob([blob], { type: mime });
-    items.push(new ClipboardItem({ [clipboardBlob.type]: clipboardBlob }));
-  }
-
-  return items;
-}
-
-async function fetchCompressedBlob(jobId: string, file: JobFile) {
-  const response = await fetch(`${API_BASE}/api/jobs/${jobId}/files/${file.id}/download`);
-  if (!response.ok) {
-    throw new Error(`下载 ${file.output_filename ?? file.filename} 失败`);
-  }
-
-  const blob = await response.blob();
-  const headerMime = response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase();
-  const mime = normalizeImageMime(headerMime, file.output_format, blob.type);
-  return { blob, mime };
-}
-
-function normalizeImageMime(headerMime?: string, outputFormat?: string | null, blobType?: string) {
-  const candidates = [formatToMime(outputFormat), blobType, headerMime];
-  return candidates.find((type) => type?.startsWith('image/')) ?? 'image/png';
-}
-
-function formatToMime(format?: string | null) {
-  const normalized = format?.toLowerCase();
-  if (normalized === 'jpg' || normalized === 'jpeg') return 'image/jpeg';
-  if (normalized === 'webp') return 'image/webp';
-  if (normalized === 'png') return 'image/png';
-  return null;
-}
-
-function clipboardSupportsMime(type: string) {
-  const ClipboardItemWithSupports = ClipboardItem as typeof ClipboardItem & {
-    supports?: (type: string) => boolean;
-  };
-  return ClipboardItemWithSupports.supports ? ClipboardItemWithSupports.supports(type) : true;
-}
-
-function mimeToFormatLabel(type: string) {
-  if (type === 'image/jpeg') return 'JPG';
-  if (type === 'image/webp') return 'WebP';
-  if (type === 'image/png') return 'PNG';
-  return type;
-}
-
-function clipboardErrorMessage(err: unknown, fallback: string) {
-  if (!(err instanceof Error)) return fallback;
-  if (err.name === 'NotAllowedError') return '剪贴板权限被拒绝，请授权后重试，或使用下载入口';
-  if (err.name === 'NotFoundError') return '剪贴板里没有可读取的图片';
-  return err.message || fallback;
-}
-
-function statusText(file: JobFile) {
-  if (file.status === 'queued') return '等待处理';
-  if (file.status === 'processing') return '正在压缩';
-  if (file.status === 'error') return file.error ?? '处理失败';
-  const sizeText = file.output_width && file.output_height ? `${file.output_width} x ${file.output_height}` : '';
-  const targetText = file.success ? '已达目标体积' : '未完全达标';
-  return [targetText, sizeText, file.note].filter(Boolean).join(' · ');
-}
-
-function formatBytes(bytes: number) {
-  if (!bytes) return '0 KB';
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
-}
-
-async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, init);
-  if (!response.ok) {
-    let detail = response.statusText;
-    try {
-      const payload = await response.json();
-      detail = payload.detail ?? detail;
-    } catch {
-      // Keep the HTTP status text when the response is not JSON.
-    }
-    throw new Error(detail);
-  }
-  return response.json() as Promise<T>;
 }
 
 createRoot(document.getElementById('root')!).render(

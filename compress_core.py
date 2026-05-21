@@ -40,6 +40,10 @@ class CompressOptions:
     aggressive: bool = False
 
 
+DEFAULT_COMPRESS_OPTIONS = CompressOptions()
+OUTPUT_FORMAT_CHOICES = ("auto", "webp", "png", "jpeg", "jpg")
+
+
 @dataclass(frozen=True)
 class CompressedResult:
     data: bytes
@@ -391,7 +395,7 @@ def parse_format_arg(fmt: str) -> set[str]:
     fmt = fmt.lower()
     if fmt == "auto":
         return {"webp", "png", "jpeg"}
-    if fmt in {"webp", "png", "jpeg", "jpg"}:
+    if fmt in OUTPUT_FORMAT_CHOICES:
         return {fmt}
     raise ValueError(f"不支持的格式：{fmt}")
 

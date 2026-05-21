@@ -1,57 +1,21 @@
 from __future__ import annotations
 
 import io
-import threading
 import zipfile
-from dataclasses import asdict, dataclass, field
-from typing import Literal
 from urllib.parse import quote
 from uuid import uuid4
 
 from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
-from PIL import UnidentifiedImageError
 
+from batch_compress import BatchImage, compress_batch
 from compress_core import (
+    DEFAULT_COMPRESS_OPTIONS,
     CompressOptions,
-    CompressedResult,
-    compress_image_bytes,
     validate_options,
 )
-
-
-JobStatus = Literal["queued", "processing", "done"]
-FileStatus = Literal["queued", "processing", "done", "error"]
-
-
-@dataclass
-class JobFile:
-    id: str
-    filename: str
-    status: FileStatus = "queued"
-    original_size: int = 0
-    original_width: int | None = None
-    original_height: int | None = None
-    output_filename: str | None = None
-    output_size: int | None = None
-    output_width: int | None = None
-    output_height: int | None = None
-    output_format: str | None = None
-    note: str | None = None
-    success: bool | None = None
-    error: str | None = None
-    data: bytes | None = field(default=None, repr=False)
-
-
-@dataclass
-class Job:
-    id: str
-    status: JobStatus
-    files: list[JobFile]
-    total: int
-    completed: int = 0
-    failed: int = 0
+from job_store import InMemoryJobStore, JobFile, JobFileNotFound, JobNotFound
 
 
 app = FastAPI(title="中文图片压缩工具", version="1.0.0")
@@ -63,114 +27,46 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-_jobs: dict[str, Job] = {}
-_lock = threading.Lock()
-
-
-def _serialize_file(job_file: JobFile) -> dict:
-    payload = asdict(job_file)
-    payload.pop("data", None)
-    if payload["original_size"] and payload["output_size"]:
-        saved = max(0, payload["original_size"] - payload["output_size"])
-        payload["compression_ratio"] = round(saved / payload["original_size"], 4)
-    else:
-        payload["compression_ratio"] = None
-    return payload
-
-
-def _serialize_job(job: Job) -> dict:
-    return {
-        "id": job.id,
-        "status": job.status,
-        "total": job.total,
-        "completed": job.completed,
-        "failed": job.failed,
-        "files": [_serialize_file(file) for file in job.files],
-    }
-
-
-def _find_job(job_id: str) -> Job:
-    job = _jobs.get(job_id)
-    if job is None:
-        raise HTTPException(status_code=404, detail="任务不存在")
-    return job
-
-
-def _find_job_file(job: Job, file_id: str) -> JobFile:
-    for file in job.files:
-        if file.id == file_id:
-            return file
-    raise HTTPException(status_code=404, detail="文件不存在")
-
-
-def _apply_result(job_file: JobFile, result: CompressedResult) -> None:
-    job_file.status = "done"
-    job_file.original_size = result.original_size
-    job_file.original_width = result.original_width
-    job_file.original_height = result.original_height
-    job_file.output_filename = result.output_filename
-    job_file.output_size = result.output_size
-    job_file.output_width = result.output_width
-    job_file.output_height = result.output_height
-    job_file.output_format = result.fmt
-    job_file.note = result.note
-    job_file.success = result.success
-    job_file.data = result.data
+job_store = InMemoryJobStore()
+_jobs = job_store._jobs
 
 
 def _process_job(
     job_id: str,
-    uploads: list[tuple[str, str, bytes]],
+    uploads: list[BatchImage],
     options: CompressOptions,
 ) -> None:
-    with _lock:
-        job = _jobs[job_id]
-        job.status = "processing"
+    job_store.mark_job_processing(job_id)
 
-    for file_id, filename, content in uploads:
-        with _lock:
-            job = _jobs[job_id]
-            job_file = _find_job_file(job, file_id)
-            job_file.status = "processing"
-
-        try:
-            result = compress_image_bytes(content, filename, options)
-        except UnidentifiedImageError:
-            error = "无法识别图片格式"
-        except ValueError as exc:
-            error = str(exc)
-        except Exception as exc:
-            error = f"处理失败：{exc}"
+    for item in uploads:
+        job_store.mark_file_processing(job_id, item.id)
+        batch_result = next(compress_batch([item], options))
+        if batch_result.result is not None:
+            job_store.apply_success(job_id, batch_result.id, batch_result.result)
         else:
-            with _lock:
-                _apply_result(job_file, result)
-                job.completed += 1
-            continue
+            job_store.apply_failure(
+                job_id,
+                batch_result.id,
+                batch_result.original_size,
+                batch_result.error or "处理失败",
+            )
 
-        with _lock:
-            job_file.status = "error"
-            job_file.error = error
-            job_file.original_size = len(content)
-            job.failed += 1
-
-    with _lock:
-        job = _jobs[job_id]
-        job.status = "done"
+    job_store.mark_job_done(job_id)
 
 
 @app.post("/api/jobs")
 async def create_job(
     background_tasks: BackgroundTasks,
     files: list[UploadFile] = File(...),
-    target_kb: int = Form(80),
-    max_side: int = Form(1300),
-    output_format: str = Form("jpg"),
-    min_quality: int = Form(70),
+    target_kb: int = Form(DEFAULT_COMPRESS_OPTIONS.target_kb),
+    max_side: int = Form(DEFAULT_COMPRESS_OPTIONS.max_side),
+    output_format: str = Form(DEFAULT_COMPRESS_OPTIONS.output_format),
+    min_quality: int = Form(DEFAULT_COMPRESS_OPTIONS.min_quality),
     min_long_side: int | None = Form(None),
-    scale_step: float = Form(0.92),
-    grayscale: bool = Form(False),
-    sharpness: float = Form(1.10),
-    aggressive: bool = Form(False),
+    scale_step: float = Form(DEFAULT_COMPRESS_OPTIONS.scale_step),
+    grayscale: bool = Form(DEFAULT_COMPRESS_OPTIONS.grayscale),
+    sharpness: float = Form(DEFAULT_COMPRESS_OPTIONS.sharpness),
+    aggressive: bool = Form(DEFAULT_COMPRESS_OPTIONS.aggressive),
 ) -> dict:
     if not files:
         raise HTTPException(status_code=400, detail="请至少上传一张图片")
@@ -191,13 +87,13 @@ async def create_job(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    uploads: list[tuple[str, str, bytes]] = []
+    uploads: list[BatchImage] = []
     job_files: list[JobFile] = []
     for upload in files:
         content = await upload.read()
         file_id = uuid4().hex
         filename = upload.filename or "image"
-        uploads.append((file_id, filename, content))
+        uploads.append(BatchImage(id=file_id, filename=filename, data=content))
         job_files.append(
             JobFile(
                 id=file_id,
@@ -207,28 +103,28 @@ async def create_job(
         )
 
     job_id = uuid4().hex
-    job = Job(id=job_id, status="queued", files=job_files, total=len(job_files))
-    with _lock:
-        _jobs[job_id] = job
+    job_store.create_job(job_id, job_files)
 
     background_tasks.add_task(_process_job, job_id, uploads, options)
-    return _serialize_job(job)
+    return job_store.serialize_job(job_id)
 
 
 @app.get("/api/jobs/{job_id}")
 def get_job(job_id: str) -> dict:
-    with _lock:
-        job = _find_job(job_id)
-        return _serialize_job(job)
+    try:
+        return job_store.serialize_job(job_id)
+    except JobNotFound as exc:
+        raise HTTPException(status_code=404, detail="任务不存在") from exc
 
 
 @app.get("/api/jobs/{job_id}/files/{file_id}/download")
 def download_file(job_id: str, file_id: str) -> Response:
-    with _lock:
-        job = _find_job(job_id)
-        job_file = _find_job_file(job, file_id)
-        data = job_file.data
-        filename = job_file.output_filename
+    try:
+        data, filename = job_store.get_download(job_id, file_id)
+    except JobNotFound as exc:
+        raise HTTPException(status_code=404, detail="任务不存在") from exc
+    except JobFileNotFound as exc:
+        raise HTTPException(status_code=404, detail="文件不存在") from exc
 
     if not data or not filename:
         raise HTTPException(status_code=404, detail="文件尚未成功处理")
@@ -242,13 +138,10 @@ def download_file(job_id: str, file_id: str) -> Response:
 
 @app.get("/api/jobs/{job_id}/download.zip")
 def download_zip(job_id: str) -> StreamingResponse:
-    with _lock:
-        job = _find_job(job_id)
-        successful_files = [
-            (file.output_filename, file.data)
-            for file in job.files
-            if file.status == "done" and file.output_filename and file.data
-        ]
+    try:
+        successful_files = job_store.successful_files(job_id)
+    except JobNotFound as exc:
+        raise HTTPException(status_code=404, detail="任务不存在") from exc
 
     if not successful_files:
         raise HTTPException(status_code=404, detail="暂无可下载的压缩结果")

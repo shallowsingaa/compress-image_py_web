@@ -9,13 +9,13 @@ This project has three entry points over one compression core:
 - CLI: `main.py` calls the same core functions for single-file compression and Windows clipboard batches.
 - npm package: `package/` wraps the CLI as `compress-img-cli`, installing the `compress-img` command that launches a platform-specific PyInstaller binary.
 
-`compress_core.py` owns image processing. Keep new compression behavior in this module first, then expose it through the API, CLI, and frontend as needed.
+`compress_core.py` owns image processing. `batch_compress.py` owns per-file batch semantics over that core. Keep new compression behavior in the core first, then expose it through the batch flow, API, CLI, and frontend as needed.
 
 ## Data Flow
 
 1. The frontend sends `multipart/form-data` to `POST /api/jobs` with one or more `files` fields and compression options.
-2. `app.py` validates the form into `CompressOptions`, stores a `Job` with `JobFile` entries in `_jobs`, and schedules background processing.
-3. `_process_job()` calls `compress_image_bytes()` for each upload.
+2. `app.py` validates the form into `CompressOptions`, stores a `Job` with `JobFile` entries through `job_store.py`, and schedules background processing.
+3. `_process_job()` passes each upload through `batch_compress.py`, which calls `compress_image_bytes()` and returns either a compressed result or a per-file error.
 4. `compress_core.py` opens the image with Pillow, applies EXIF transpose, constrains longest side, generates candidates across formats, quality levels, palette settings, and downscaled dimensions, then chooses the best candidate.
 5. The frontend polls `GET /api/jobs/{job_id}` until the job is `done`.
 6. Successful files can be downloaded individually or as `download.zip`.
@@ -30,7 +30,7 @@ CLI Windows clipboard flow:
 
 1. `main.py --clipboard` calls `clipboard_io.read_clipboard_images()`.
 2. `clipboard_io.py` reads copied image files from `CF_HDROP`, or screenshot bitmap data from `CF_DIB`.
-3. Each clipboard image is compressed through `compress_image_bytes()`.
+3. Each clipboard image is compressed through `batch_compress.py`.
 4. Outputs are saved under a `clipboard/` subdirectory and copied back to the Windows clipboard as an `CF_HDROP` file list.
 
 npm package flow:
@@ -57,7 +57,7 @@ The target size is best-effort. If no candidate fits under `target_kb`, the API 
 
 ## State Model
 
-Jobs are stored in the module-level `_jobs` dictionary in `app.py`.
+Jobs are stored by `job_store.py` in an in-memory dictionary exposed to `app.py`.
 
 - Job statuses: `queued`, `processing`, `done`.
 - File statuses: `queued`, `processing`, `done`, `error`.

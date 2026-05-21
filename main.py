@@ -37,13 +37,16 @@ from clipboard_io import (
     read_clipboard_images,
     write_clipboard_images,
 )
+from batch_compress import BatchImage, compress_batch
 from compress_core import (
+    DEFAULT_COMPRESS_OPTIONS,
+    OUTPUT_FORMAT_CHOICES,
     CompressedResult,
     CompressOptions,
-    compress_image_bytes,
     compress_image_file,
     format_from_suffix,
     human_size,
+    validate_options,
 )
 
 
@@ -129,6 +132,12 @@ def process_clipboard(args: argparse.Namespace, options: CompressOptions) -> int
         print("错误：剪贴板中没有可用图片。请先复制截图、图片，或在资源管理器中复制图片文件。", file=sys.stderr)
         return 2
 
+    try:
+        validate_options(options)
+    except ValueError as exc:
+        print(f"错误：{exc}", file=sys.stderr)
+        return 2
+
     print(f"剪贴板图片：{len(images)} 张")
     print("-" * 48)
 
@@ -140,18 +149,22 @@ def process_clipboard(args: argparse.Namespace, options: CompressOptions) -> int
             print()
             print("-" * 48)
 
+        batch_result = next(
+            compress_batch(
+                [BatchImage(id=str(index), filename=image.filename, data=image.data)],
+                options,
+            )
+        )
+        if batch_result.result is None:
+            failed += 1
+            print(f"第 {index} 张处理失败：{batch_result.error}：{image.filename}", file=sys.stderr)
+            continue
+
+        result = batch_result.result
+        output_path = clipboard_output_path(image.filename, args.output, result.suffix)
         try:
-            result = compress_image_bytes(image.data, image.filename, options)
-            output_path = clipboard_output_path(image.filename, args.output, result.suffix)
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_bytes(result.data)
-        except UnidentifiedImageError:
-            failed += 1
-            print(f"第 {index} 张处理失败：无法识别图片格式：{image.filename}", file=sys.stderr)
-            continue
-        except ValueError as exc:
-            print(f"错误：{exc}", file=sys.stderr)
-            return 2
         except Exception as exc:
             failed += 1
             print(f"第 {index} 张处理失败：{exc}", file=sys.stderr)
@@ -195,13 +208,23 @@ def main(argv: Optional[list[str]] = None) -> int:
         action="store_true",
         help="从 Windows 剪贴板读取图片作为输入，处理成功后复制结果回剪贴板",
     )
-    parser.add_argument("--max-side", type=positive_int, default=1300, help="最长边上限，默认 1300")
-    parser.add_argument("--target-kb", type=positive_int, default=80, help="目标体积 KB，默认 80")
+    parser.add_argument(
+        "--max-side",
+        type=positive_int,
+        default=DEFAULT_COMPRESS_OPTIONS.max_side,
+        help=f"最长边上限，默认 {DEFAULT_COMPRESS_OPTIONS.max_side}",
+    )
+    parser.add_argument(
+        "--target-kb",
+        type=positive_int,
+        default=DEFAULT_COMPRESS_OPTIONS.target_kb,
+        help=f"目标体积 KB，默认 {DEFAULT_COMPRESS_OPTIONS.target_kb}",
+    )
     parser.add_argument(
         "--min-quality",
         type=positive_int,
-        default=70,
-        help="WebP/JPEG 最低质量，默认 70；越低越小但越容易糊",
+        default=DEFAULT_COMPRESS_OPTIONS.min_quality,
+        help=f"WebP/JPEG 最低质量，默认 {DEFAULT_COMPRESS_OPTIONS.min_quality}；越低越小但越容易糊",
     )
     parser.add_argument(
         "--min-long-side",
@@ -212,13 +235,13 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument(
         "--scale-step",
         type=float,
-        default=0.92,
-        help="逐步缩小尺寸的比例，默认 0.92；越小尝试越少",
+        default=DEFAULT_COMPRESS_OPTIONS.scale_step,
+        help=f"逐步缩小尺寸的比例，默认 {DEFAULT_COMPRESS_OPTIONS.scale_step}；越小尝试越少",
     )
     parser.add_argument(
         "--format",
         default=None,
-        choices=["auto", "webp", "png", "jpeg", "jpg"],
+        choices=OUTPUT_FORMAT_CHOICES,
         help="输出格式，默认 jpg；未指定时会优先使用输出路径后缀",
     )
     parser.add_argument(
@@ -229,8 +252,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument(
         "--sharpness",
         type=float,
-        default=1.10,
-        help="轻微锐化强度，默认 1.10；设为 1 可关闭",
+        default=DEFAULT_COMPRESS_OPTIONS.sharpness,
+        help=f"轻微锐化强度，默认 {DEFAULT_COMPRESS_OPTIONS.sharpness:.2f}；设为 1 可关闭",
     )
     parser.add_argument(
         "--aggressive",
